@@ -13,11 +13,12 @@ export class BattleScene extends Phaser.Scene {
   private enemy!: EnemyData;
   private stage!: number;
   private runeSprites: (Phaser.GameObjects.Container | null)[][] = [];
-  private selectedCell: [number, number] | null = null;
   private isProcessing = false;
   private shieldBuffer = 0;
   private comboCount = 0;
   private fx!: Effects;
+  private dragStartCell: [number, number] | null = null;
+  private isDragging = false;
 
   // UI elements
   private playerHpText!: Phaser.GameObjects.Text;
@@ -38,11 +39,12 @@ export class BattleScene extends Phaser.Scene {
     this.player = data.player;
     this.stage = data.stage;
     this.enemy = generateEnemy(this.stage);
-    this.selectedCell = null;
     this.isProcessing = false;
     this.shieldBuffer = 0;
     this.comboCount = 0;
     this.runeSprites = [];
+    this.dragStartCell = null;
+    this.isDragging = false;
   }
 
   create(): void {
@@ -97,14 +99,54 @@ export class BattleScene extends Phaser.Scene {
     // Create board sprites
     this.createBoardSprites();
 
-    // Input
-    this.input.on('gameobjectdown', (_ptr: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+    // Drag-based input
+    this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
       if (this.isProcessing) return;
-      const r = obj.getData('row') as number;
-      const c = obj.getData('col') as number;
-      if (r === undefined || c === undefined) return;
-      this.onCellClick(r, c);
+      const cell = this.pointerToCell(ptr.x, ptr.y);
+      if (!cell) return;
+      this.dragStartCell = cell;
+      this.isDragging = false;
+      this.highlightCell(cell[0], cell[1], true);
     });
+
+    this.input.on('pointermove', (ptr: Phaser.Input.Pointer) => {
+      if (this.isProcessing || !this.dragStartCell || this.isDragging) return;
+      if (!ptr.isDown) return;
+      const [sr, sc] = this.dragStartCell;
+      const dx = ptr.x - (BOARD_OFFSET_X + sc * CELL_SIZE + CELL_SIZE / 2);
+      const dy = ptr.y - (BOARD_OFFSET_Y + sr * CELL_SIZE + CELL_SIZE / 2);
+      const threshold = CELL_SIZE * 0.3;
+      if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+
+      // Determine swipe direction
+      let tr = sr, tc = sc;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        tc += dx > 0 ? 1 : -1;
+      } else {
+        tr += dy > 0 ? 1 : -1;
+      }
+
+      if (tr < 0 || tr >= BOARD_ROWS || tc < 0 || tc >= BOARD_COLS) return;
+
+      this.isDragging = true;
+      this.highlightCell(sr, sc, false);
+      this.dragStartCell = null;
+      this.trySwap(sr, sc, tr, tc);
+    });
+
+    this.input.on('pointerup', () => {
+      if (this.dragStartCell) {
+        this.highlightCell(this.dragStartCell[0], this.dragStartCell[1], false);
+        this.dragStartCell = null;
+      }
+    });
+  }
+
+  private pointerToCell(x: number, y: number): [number, number] | null {
+    const c = Math.floor((x - BOARD_OFFSET_X) / CELL_SIZE);
+    const r = Math.floor((y - BOARD_OFFSET_Y) / CELL_SIZE);
+    if (r < 0 || r >= BOARD_ROWS || c < 0 || c >= BOARD_COLS) return null;
+    return [r, c];
   }
 
   private createBoardSprites(): void {
@@ -146,32 +188,6 @@ export class BattleScene extends Phaser.Scene {
     container.setData('col', c);
 
     return container;
-  }
-
-  private onCellClick(r: number, c: number): void {
-    if (!this.selectedCell) {
-      this.selectedCell = [r, c];
-      this.highlightCell(r, c, true);
-      return;
-    }
-
-    const [sr, sc] = this.selectedCell;
-    this.highlightCell(sr, sc, false);
-
-    if (sr === r && sc === c) {
-      this.selectedCell = null;
-      return;
-    }
-
-    if (!this.board.isAdjacent(sr, sc, r, c)) {
-      // Select new cell instead
-      this.selectedCell = [r, c];
-      this.highlightCell(r, c, true);
-      return;
-    }
-
-    this.selectedCell = null;
-    this.trySwap(sr, sc, r, c);
   }
 
   private highlightCell(r: number, c: number, on: boolean): void {

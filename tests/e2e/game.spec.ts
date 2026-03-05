@@ -65,14 +65,42 @@ test.describe('Rune Cascade', () => {
       await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.53);
       await page.waitForTimeout(2000);
 
-      // Try clicking on the board area (should not crash)
+      // Try dragging on the board area (should not crash)
       const boardY = box.y + box.height * 0.55;
       const boardX = box.x + box.width * 0.3;
-      await page.mouse.click(boardX, boardY);
-      await page.waitForTimeout(500);
-      // Click adjacent cell
-      await page.mouse.click(boardX + 40, boardY);
+      await page.mouse.move(boardX, boardY);
+      await page.mouse.down();
+      await page.mouse.move(boardX + 50, boardY, { steps: 5 });
+      await page.mouse.up();
       await page.waitForTimeout(2000);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test('drag swap does not crash on multiple swipes', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (err) => errors.push(err.message));
+    await page.goto('/');
+    const canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible({ timeout: 10000 });
+
+    const box = await canvas.boundingBox();
+    if (box) {
+      // Click START
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.53);
+      await page.waitForTimeout(2000);
+
+      // Multiple drag swipes in different directions
+      const boardX = box.x + box.width * 0.4;
+      const boardY = box.y + box.height * 0.6;
+
+      for (const [dx, dy] of [[50, 0], [0, 50], [-50, 0], [0, -50]]) {
+        await page.mouse.move(boardX, boardY);
+        await page.mouse.down();
+        await page.mouse.move(boardX + dx, boardY + dy, { steps: 5 });
+        await page.mouse.up();
+        await page.waitForTimeout(1500);
+      }
     }
     expect(errors).toEqual([]);
   });
