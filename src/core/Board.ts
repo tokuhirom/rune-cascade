@@ -17,12 +17,14 @@ export class Board {
       }
     }
     // Remove initial matches
-    while (this.findMatches().length > 0) {
-      for (const match of this.findMatches()) {
+    let initialMatches = this.findMatches();
+    while (initialMatches.length > 0) {
+      for (const match of initialMatches) {
         for (const [r, c] of match.positions) {
           this.grid[r][c] = this.randomRune();
         }
       }
+      initialMatches = this.findMatches();
     }
   }
 
@@ -102,7 +104,8 @@ export class Board {
     }
   }
 
-  // Returns array of {col, fromRow, toRow} for animations
+  // Returns array of {col, fromRow, toRow} for animations.
+  // Includes ALL runes (moved, stationary, and new) so animateDrops can rebuild all sprites.
   applyGravity(): { col: number; fromRow: number; toRow: number; type: RuneType }[] {
     const drops: { col: number; fromRow: number; toRow: number; type: RuneType }[] = [];
 
@@ -114,6 +117,9 @@ export class Board {
             drops.push({ col: c, fromRow: r, toRow: writePos, type: this.grid[r][c]! });
             this.grid[writePos][c] = this.grid[r][c];
             this.grid[r][c] = null;
+          } else {
+            // Stationary rune: still include in drops so sprites are rebuilt
+            drops.push({ col: c, fromRow: r, toRow: r, type: this.grid[r][c]! });
           }
           writePos--;
         }
