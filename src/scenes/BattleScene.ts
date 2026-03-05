@@ -60,7 +60,7 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5, 0);
 
     // Enemy area
-    this.enemySprite = this.add.image(width / 2, 90, 'enemy').setScale(0.8);
+    this.enemySprite = this.add.image(width / 2, 90, `enemy_${this.enemy.name}`).setScale(0.8);
     this.enemyNameText = this.add.text(width / 2, 140, this.enemy.name, {
       fontSize: '16px',
       color: '#ecf0f1',
