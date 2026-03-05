@@ -5,4 +5,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
   },
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
+  test: {
+    include: ['tests/unit/**/*.test.ts'],
+  },
 });

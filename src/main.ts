@@ -10,11 +10,11 @@ const config: Phaser.Types.Core.GameConfig = {
   width: 480,
   height: 720,
   backgroundColor: '#16213e',
-  parent: document.body,
+  parent: 'game',
   scene: [BootScene, TitleScene, BattleScene, UpgradeScene, GameOverScene],
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
   },
 };
 

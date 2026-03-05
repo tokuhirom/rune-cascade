@@ -6,10 +6,12 @@
   <title>Rune Cascade</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #1a1a2e; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; }
+    #game { width: 100%; height: 100%; }
   </style>
 </head>
 <body>
+  <div id="game"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

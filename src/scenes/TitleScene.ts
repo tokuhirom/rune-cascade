@@ -76,5 +76,12 @@ export class TitleScene extends Phaser.Scene {
       fontSize: '14px',
       color: '#95a5a6',
     }).setOrigin(0.5);
+
+    // Build date
+    const buildDate = new Date(__BUILD_TIME__).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    this.add.text(width / 2, height - 16, `Build: ${buildDate}`, {
+      fontSize: '11px',
+      color: '#555555',
+    }).setOrigin(0.5, 1);
   }
 }
