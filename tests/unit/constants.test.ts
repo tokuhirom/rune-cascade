@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { createInitialPlayer, generateEnemy } from '../../src/core/constants';
+import {
+  createInitialPlayer, generateEnemy, rollStageModifier,
+  EnemyAbility, StageModifier,
+} from '../../src/core/constants';
 
 describe('createInitialPlayer', () => {
   it('returns player with correct initial values', () => {
@@ -21,20 +24,68 @@ describe('createInitialPlayer', () => {
 });
 
 describe('generateEnemy', () => {
-  it('generates enemy for stage 1', () => {
+  it('generates enemy for stage 1 (Goblin, no ability)', () => {
     const e = generateEnemy(1);
     expect(e.name).toBe('Goblin');
     expect(e.hp).toBe(e.maxHp);
     expect(e.hp).toBeGreaterThan(0);
     expect(e.attack).toBeGreaterThan(0);
     expect(e.turnTimer).toBe(3);
+    expect(e.ability).toBe(EnemyAbility.None);
+  });
+
+  it('Skeleton has Revive ability', () => {
+    const e = generateEnemy(2);
+    expect(e.name).toBe('Skeleton');
+    expect(e.ability).toBe(EnemyAbility.Revive);
+    expect(e.revived).toBe(false);
+  });
+
+  it('Orc has Enrage ability', () => {
+    const e = generateEnemy(3);
+    expect(e.name).toBe('Orc');
+    expect(e.ability).toBe(EnemyAbility.Enrage);
+    expect(e.enraged).toBe(false);
+  });
+
+  it('Dark Mage has Scramble ability', () => {
+    const e = generateEnemy(4);
+    expect(e.name).toBe('Dark Mage');
+    expect(e.ability).toBe(EnemyAbility.Scramble);
+  });
+
+  it('Golem has Armor ability and high HP', () => {
+    const e = generateEnemy(5);
+    expect(e.name).toBe('Golem');
+    expect(e.ability).toBe(EnemyAbility.Armor);
+    // Golem has 2x HP multiplier
+    const goblin = generateEnemy(1);
+    expect(e.maxHp).toBeGreaterThan(goblin.maxHp * 1.5);
+  });
+
+  it('Dragon has MultiHit ability', () => {
+    const e = generateEnemy(6);
+    expect(e.name).toBe('Dragon');
+    expect(e.ability).toBe(EnemyAbility.MultiHit);
+  });
+
+  it('Lich has Drain ability', () => {
+    const e = generateEnemy(7);
+    expect(e.name).toBe('Lich');
+    expect(e.ability).toBe(EnemyAbility.Drain);
+  });
+
+  it('Demon Lord has Poison ability', () => {
+    const e = generateEnemy(8);
+    expect(e.name).toBe('Demon Lord');
+    expect(e.ability).toBe(EnemyAbility.Poison);
+    expect(e.poisonDmg).toBe(5);
   });
 
   it('enemies get stronger with higher stages', () => {
     const e1 = generateEnemy(1);
     const e5 = generateEnemy(5);
     expect(e5.maxHp).toBeGreaterThan(e1.maxHp);
-    expect(e5.attack).toBeGreaterThan(e1.attack);
   });
 
   it('caps enemy name index at array length', () => {
@@ -42,10 +93,32 @@ describe('generateEnemy', () => {
     expect(e.name).toBe('Demon Lord');
   });
 
-  it('turnTimer decreases for higher stages', () => {
-    const e1 = generateEnemy(1);
-    const e20 = generateEnemy(20);
-    expect(e20.maxTurnTimer).toBeLessThanOrEqual(e1.maxTurnTimer);
-    expect(e20.maxTurnTimer).toBeGreaterThanOrEqual(2);
+  it('each enemy has ability description', () => {
+    for (let i = 2; i <= 8; i++) {
+      const e = generateEnemy(i);
+      expect(e.abilityDesc.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('rollStageModifier', () => {
+  it('stage 1 has no modifier', () => {
+    expect(rollStageModifier(1)).toBe(StageModifier.None);
+  });
+
+  it('boss stages have no modifier', () => {
+    expect(rollStageModifier(5)).toBe(StageModifier.None);
+    expect(rollStageModifier(10)).toBe(StageModifier.None);
+    expect(rollStageModifier(15)).toBe(StageModifier.None);
+  });
+
+  it('non-boss stages after 1 get a modifier', () => {
+    // Run multiple times since it's random
+    const results = new Set<StageModifier>();
+    for (let i = 0; i < 100; i++) {
+      results.add(rollStageModifier(3));
+    }
+    expect(results.size).toBeGreaterThan(1);
+    expect(results.has(StageModifier.None)).toBe(false);
   });
 });

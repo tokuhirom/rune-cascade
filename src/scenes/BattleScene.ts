@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { Board, MatchResult } from '../core/Board';
 import {
   BOARD_COLS, BOARD_ROWS, CELL_SIZE, BOARD_OFFSET_X, BOARD_OFFSET_Y,
-  RuneType, RUNE_SYMBOLS, RUNE_COLORS,
-  PlayerStats, EnemyData, generateEnemy,
+  RuneType, RUNE_SYMBOLS,
+  PlayerStats, EnemyData, EnemyAbility, generateEnemy,
+  StageModifier, STAGE_MODIFIERS, rollStageModifier,
 } from '../core/constants';
 import { Effects } from '../core/Effects';
 
@@ -16,9 +17,11 @@ export class BattleScene extends Phaser.Scene {
   private isProcessing = false;
   private shieldBuffer = 0;
   private comboCount = 0;
+  private turnCount = 0;
   private fx!: Effects;
   private dragStartCell: [number, number] | null = null;
   private isDragging = false;
+  private modifier!: StageModifier;
 
   // UI elements
   private playerHpText!: Phaser.GameObjects.Text;
@@ -26,10 +29,12 @@ export class BattleScene extends Phaser.Scene {
   private enemyHpText!: Phaser.GameObjects.Text;
   private enemyHpBar!: Phaser.GameObjects.Graphics;
   private enemyNameText!: Phaser.GameObjects.Text;
+  private enemyAbilityText!: Phaser.GameObjects.Text;
   private enemyTimerText!: Phaser.GameObjects.Text;
   private enemySprite!: Phaser.GameObjects.Image;
   private stageText!: Phaser.GameObjects.Text;
-  private comboText!: Phaser.GameObjects.Text;
+  private modifierText!: Phaser.GameObjects.Text;
+  private statusText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('Battle');
@@ -42,9 +47,11 @@ export class BattleScene extends Phaser.Scene {
     this.isProcessing = false;
     this.shieldBuffer = 0;
     this.comboCount = 0;
+    this.turnCount = 0;
     this.runeSprites = [];
     this.dragStartCell = null;
     this.isDragging = false;
+    this.modifier = rollStageModifier(this.stage);
   }
 
   create(): void {
@@ -52,20 +59,43 @@ export class BattleScene extends Phaser.Scene {
     this.board = new Board();
     this.fx = new Effects(this);
 
+    const isBoss = this.stage % 5 === 0;
+
     // Stage header
-    this.stageText = this.add.text(width / 2, 16, `Stage ${this.stage}`, {
-      fontSize: '18px',
-      color: '#f1c40f',
+    const stageLabel = isBoss ? `BOSS - Stage ${this.stage}` : `Stage ${this.stage}`;
+    this.stageText = this.add.text(width / 2, 10, stageLabel, {
+      fontSize: isBoss ? '20px' : '16px',
+      color: isBoss ? '#ff4444' : '#f1c40f',
       fontStyle: 'bold',
     }).setOrigin(0.5, 0);
 
+    // Modifier display
+    const modData = STAGE_MODIFIERS[this.modifier];
+    this.modifierText = this.add.text(width / 2, 30, '', {
+      fontSize: '12px',
+      color: modData.color,
+    }).setOrigin(0.5, 0);
+    if (this.modifier !== StageModifier.None) {
+      this.modifierText.setText(`[${modData.name}] ${modData.desc}`);
+    }
+
     // Enemy area
-    this.enemySprite = this.add.image(width / 2, 90, `enemy_${this.enemy.name}`).setScale(0.8);
-    this.enemyNameText = this.add.text(width / 2, 140, this.enemy.name, {
-      fontSize: '16px',
-      color: '#ecf0f1',
+    this.enemySprite = this.add.image(width / 2, 85, `enemy_${this.enemy.name}`)
+      .setScale(isBoss ? 1.0 : 0.8);
+    this.enemyNameText = this.add.text(width / 2, 132, this.enemy.name, {
+      fontSize: isBoss ? '18px' : '16px',
+      color: isBoss ? '#ff6666' : '#ecf0f1',
       fontStyle: 'bold',
     }).setOrigin(0.5);
+
+    // Enemy ability
+    this.enemyAbilityText = this.add.text(width / 2, 150, '', {
+      fontSize: '11px',
+      color: '#e67e22',
+    }).setOrigin(0.5);
+    if (this.enemy.ability !== EnemyAbility.None) {
+      this.enemyAbilityText.setText(this.enemy.abilityDesc);
+    }
 
     // Enemy HP bar
     this.enemyHpBar = this.add.graphics();
@@ -82,19 +112,30 @@ export class BattleScene extends Phaser.Scene {
 
     // Player HP bar
     this.playerHpBar = this.add.graphics();
-    this.playerHpText = this.add.text(width / 2, 222, '', {
+    this.playerHpText = this.add.text(width / 2, 218, '', {
       fontSize: '13px',
       color: '#ffffff',
     }).setOrigin(0.5);
 
-    // Combo text
-    this.comboText = this.add.text(width / 2, 254, '', {
-      fontSize: '20px',
-      color: '#f39c12',
-      fontStyle: 'bold',
-    }).setOrigin(0.5).setAlpha(0);
+    // Status effects
+    this.statusText = this.add.text(width / 2, 236, '', {
+      fontSize: '11px',
+      color: '#bb88ff',
+    }).setOrigin(0.5);
 
     this.updateUI();
+
+    // Boss entrance animation
+    if (isBoss) {
+      this.enemySprite.setAlpha(0).setScale(2);
+      this.tweens.add({
+        targets: this.enemySprite,
+        alpha: 1, scaleX: 1.0, scaleY: 1.0,
+        duration: 600, ease: 'Back.easeOut',
+      });
+      this.fx.screenShake(6, 400);
+      this.cameras.main.flash(400, 100, 20, 20);
+    }
 
     // Create board sprites
     this.createBoardSprites();
@@ -118,7 +159,6 @@ export class BattleScene extends Phaser.Scene {
       const threshold = CELL_SIZE * 0.3;
       if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
 
-      // Determine swipe direction
       let tr = sr, tc = sc;
       if (Math.abs(dx) > Math.abs(dy)) {
         tc += dx > 0 ? 1 : -1;
@@ -150,7 +190,6 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createBoardSprites(): void {
-    // Clear existing
     for (const row of this.runeSprites) {
       if (row) {
         for (const sprite of row) {
@@ -193,11 +232,7 @@ export class BattleScene extends Phaser.Scene {
   private highlightCell(r: number, c: number, on: boolean): void {
     const sprite = this.runeSprites[r]?.[c];
     if (!sprite) return;
-    if (on) {
-      sprite.setScale(1.15);
-    } else {
-      sprite.setScale(1);
-    }
+    sprite.setScale(on ? 1.15 : 1);
   }
 
   private async trySwap(r1: number, c1: number, r2: number, c2: number): Promise<void> {
@@ -205,22 +240,33 @@ export class BattleScene extends Phaser.Scene {
     this.comboCount = 0;
     this.shieldBuffer = 0;
 
-    // Animate swap
     this.board.swap(r1, c1, r2, c2);
     await this.animateSwap(r1, c1, r2, c2);
 
-    // Check matches
     const matches = this.board.findMatches();
     if (matches.length === 0) {
-      // Swap back
       this.board.swap(r1, c1, r2, c2);
       await this.animateSwap(r1, c1, r2, c2);
       this.isProcessing = false;
       return;
     }
 
-    // Process cascades
     await this.processCascades();
+
+    this.turnCount++;
+
+    // Poison damage
+    if (this.enemy.hp > 0 && this.enemy.ability === EnemyAbility.Poison && this.enemy.poisonDmg) {
+      const poisonDmg = this.enemy.poisonDmg;
+      this.player.hp = Math.max(0, this.player.hp - poisonDmg);
+      this.showStatusMessage(`Poison: -${poisonDmg} HP`, '#9b59b6');
+      this.updateUI();
+    }
+
+    // Rune Storm modifier: shuffle every 3 turns
+    if (this.modifier === StageModifier.RuneStorm && this.turnCount % 3 === 0 && this.enemy.hp > 0) {
+      await this.shuffleBoard();
+    }
 
     // Enemy turn
     this.enemy.turnTimer--;
@@ -232,7 +278,7 @@ export class BattleScene extends Phaser.Scene {
       this.updateUI();
     }
 
-    // Check death
+    // Check player death
     if (this.player.hp <= 0) {
       this.time.delayedCall(500, () => {
         this.scene.start('GameOver', {
@@ -255,23 +301,24 @@ export class BattleScene extends Phaser.Scene {
         this.showCombo(this.comboCount);
       }
 
-      // Apply match effects
       this.applyMatchEffects(matches);
 
-      // Remove matched runes with animation
       await this.animateRemove(matches);
       this.board.removeMatches(matches);
 
-      // Gravity
       const drops = this.board.applyGravity();
       await this.animateDrops(drops);
 
       this.updateUI();
 
-      // Check enemy death
+      // Check enemy death / revive
       if (this.enemy.hp <= 0) {
-        await this.enemyDefeated();
-        return;
+        if (this.enemy.ability === EnemyAbility.Revive && !this.enemy.revived) {
+          await this.enemyRevive();
+        } else {
+          await this.enemyDefeated();
+          return;
+        }
       }
 
       matches = this.board.findMatches();
@@ -280,13 +327,15 @@ export class BattleScene extends Phaser.Scene {
 
   private applyMatchEffects(matches: MatchResult[]): void {
     const comboMult = 1 + (this.comboCount - 1) * 0.25;
+    const berserkMult = this.modifier === StageModifier.Berserk ? 1.5 : 1;
+    const desperateMult = this.modifier === StageModifier.Desperate ? 1.5 : 1;
 
     for (const match of matches) {
       const count = match.positions.length;
       const bonus = count > 3 ? (count - 3) * 0.5 : 0;
       const power = (1 + bonus) * comboMult;
 
-      // Particle burst for each matched rune
+      // Particle burst
       for (const [mr, mc] of match.positions) {
         const mx = BOARD_OFFSET_X + mc * CELL_SIZE + CELL_SIZE / 2;
         const my = BOARD_OFFSET_Y + mr * CELL_SIZE + CELL_SIZE / 2;
@@ -297,76 +346,140 @@ export class BattleScene extends Phaser.Scene {
 
       switch (match.type) {
         case RuneType.Sword: {
-          const dmg = Math.floor(this.player.attack * power);
+          let dmg = Math.floor(this.player.attack * power * berserkMult * desperateMult);
+          // Armor ability: 50% damage reduction
+          if (this.enemy.ability === EnemyAbility.Armor) {
+            dmg = Math.floor(dmg * 0.5);
+          }
           this.enemy.hp = Math.max(0, this.enemy.hp - dmg);
           this.showDamageNumber(dmg, true);
-          this.fx.slashEffect(sw / 2, 90);
+          this.fx.slashEffect(sw / 2, 85);
           this.fx.enemyHitFlash(this.enemySprite);
           this.fx.screenShake(3 + count, 150);
+
+          // Check enrage
+          if (this.enemy.ability === EnemyAbility.Enrage && !this.enemy.enraged
+              && this.enemy.hp > 0 && this.enemy.hp / this.enemy.maxHp < 0.3) {
+            this.enemy.enraged = true;
+            this.enemy.attack *= 2;
+            this.showStatusMessage('Enemy ENRAGED! ATK x2!', '#ff4444');
+            this.enemySprite.setTint(0xff4444);
+          }
+
+          // Vampiric modifier: heal from sword matches
+          if (this.modifier === StageModifier.Vampiric) {
+            const vampHeal = Math.floor(dmg * 0.2);
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + vampHeal);
+          }
           break;
         }
-        case RuneType.Shield:
-          this.shieldBuffer += Math.floor(this.player.defense * 2 * power);
-          this.fx.shieldShimmer(sw / 2, 222);
+        case RuneType.Shield: {
+          const shieldMult = this.modifier === StageModifier.Fortified ? 2 : 1;
+          this.shieldBuffer += Math.floor(this.player.defense * 2 * power * shieldMult);
+          this.fx.shieldShimmer(sw / 2, 218);
           break;
+        }
         case RuneType.Heart: {
-          const heal = Math.floor(5 * power);
-          this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
-          this.fx.healSparkle(sw / 2, 222);
+          if (this.modifier === StageModifier.Desperate) {
+            // No healing in Desperate mode
+            this.showStatusMessage('No healing!', '#e67e22');
+          } else {
+            const heal = Math.floor(5 * power);
+            this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
+            this.fx.healSparkle(sw / 2, 218);
+          }
           break;
         }
         case RuneType.Star: {
-          const starDmg = Math.floor(this.player.attack * 0.5 * power);
+          let starDmg = Math.floor(this.player.attack * 0.5 * power * berserkMult);
+          if (this.enemy.ability === EnemyAbility.Armor) {
+            starDmg = Math.floor(starDmg * 0.5);
+          }
           this.enemy.hp = Math.max(0, this.enemy.hp - starDmg);
           this.showDamageNumber(starDmg, true);
-          this.fx.slashEffect(sw / 2, 90);
+          this.fx.slashEffect(sw / 2, 85);
           this.fx.enemyHitFlash(this.enemySprite);
+
+          // Check enrage
+          if (this.enemy.ability === EnemyAbility.Enrage && !this.enemy.enraged
+              && this.enemy.hp > 0 && this.enemy.hp / this.enemy.maxHp < 0.3) {
+            this.enemy.enraged = true;
+            this.enemy.attack *= 2;
+            this.showStatusMessage('Enemy ENRAGED! ATK x2!', '#ff4444');
+            this.enemySprite.setTint(0xff4444);
+          }
           break;
         }
         case RuneType.Gold: {
-          const goldGain = Math.floor(count * power);
+          const goldMult = this.modifier === StageModifier.GoldenHour ? 2 : 1;
+          const goldGain = Math.floor(count * power * goldMult);
           this.player.gems += goldGain;
-          this.fx.goldCollect(sw / 2, 250, goldGain);
+          this.fx.goldCollect(sw / 2, 248, goldGain);
           break;
         }
       }
     }
   }
 
+  private async enemyRevive(): Promise<void> {
+    this.enemy.revived = true;
+    this.enemy.hp = Math.floor(this.enemy.maxHp * 0.5);
+
+    const { width } = this.scale;
+    this.showStatusMessage('Enemy REVIVED!', '#d4c8a8');
+    this.fx.screenShake(5, 300);
+
+    // Flash the enemy back in
+    this.tweens.add({
+      targets: this.enemySprite,
+      alpha: 0.2, duration: 150, yoyo: true, repeat: 3,
+    });
+
+    await this.delay(800);
+    this.updateUI();
+  }
+
   private async enemyDefeated(): Promise<void> {
     const { width } = this.scale;
-    this.fx.deathExplosion(width / 2, 90);
+    this.fx.deathExplosion(width / 2, 85);
 
     this.tweens.add({
       targets: this.enemySprite,
-      alpha: 0,
-      scaleX: 1.5,
-      scaleY: 1.5,
+      alpha: 0, scaleX: 1.5, scaleY: 1.5,
       duration: 400,
     });
 
-    const gemsEarned = 5 + this.stage * 3;
+    const isBoss = this.stage % 5 === 0;
+    const gemsEarned = isBoss ? 15 + this.stage * 5 : 5 + this.stage * 3;
     this.player.gems += gemsEarned;
 
-    const victoryText = this.add.text(width / 2, 100, `+${gemsEarned} Gems!`, {
-      fontSize: '24px',
-      color: '#f1c40f',
+    const victoryText = this.add.text(width / 2, 90, isBoss ? 'BOSS DEFEATED!' : `+${gemsEarned} Gems!`, {
+      fontSize: isBoss ? '28px' : '24px',
+      color: isBoss ? '#ff4444' : '#f1c40f',
       fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: isBoss ? 4 : 0,
     }).setOrigin(0.5);
+
+    if (isBoss) {
+      this.fx.screenShake(10, 500);
+      // Show gems separately for boss
+      this.add.text(width / 2, 120, `+${gemsEarned} Gems!`, {
+        fontSize: '20px',
+        color: '#f1c40f',
+        fontStyle: 'bold',
+      }).setOrigin(0.5);
+    }
 
     this.tweens.add({
       targets: victoryText,
-      y: 60,
-      alpha: 0,
-      duration: 1500,
-      delay: 500,
+      y: 50, alpha: 0,
+      duration: 1500, delay: 800,
     });
 
-    await this.delay(1500);
+    await this.delay(1800);
 
-    // Next stage
     if (this.stage % 5 === 0) {
-      // Every 5 stages, go to upgrade screen
       this.savePersistent();
       this.scene.start('Upgrade', { player: this.player, stage: this.stage + 1 });
     } else {
@@ -375,29 +488,131 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private async enemyAttack(): Promise<void> {
-    let dmg = this.enemy.attack - this.shieldBuffer;
-    this.shieldBuffer = 0;
+    const berserkMult = this.modifier === StageModifier.Berserk ? 1.5 : 1;
 
-    if (dmg < 0) dmg = 0;
-    this.player.hp = Math.max(0, this.player.hp - dmg);
-
-    if (dmg > 0) {
+    if (this.enemy.ability === EnemyAbility.MultiHit) {
+      // 3 weaker hits
+      for (let i = 0; i < 3; i++) {
+        let dmg = Math.floor(this.enemy.attack * 0.5 * berserkMult) - this.shieldBuffer;
+        this.shieldBuffer = Math.max(0, this.shieldBuffer - Math.floor(this.enemy.attack * 0.5 * berserkMult));
+        if (dmg < 0) dmg = 0;
+        this.player.hp = Math.max(0, this.player.hp - dmg);
+        if (dmg > 0) {
+          this.fx.screenShake(4, 100);
+          this.showDamageNumber(dmg, false);
+        }
+        await this.delay(200);
+      }
       this.fx.playerDamageFlash();
-      this.fx.screenShake(8, 300);
-      this.showDamageNumber(dmg, false);
+      this.shieldBuffer = 0;
     } else {
-      // Shield absorbed the hit
-      const { width } = this.scale;
-      this.fx.shieldShimmer(width / 2, 222);
+      let baseDmg = Math.floor(this.enemy.attack * berserkMult);
+      let dmg = baseDmg - this.shieldBuffer;
+      this.shieldBuffer = 0;
+      if (dmg < 0) dmg = 0;
+      this.player.hp = Math.max(0, this.player.hp - dmg);
+
+      if (dmg > 0) {
+        this.fx.playerDamageFlash();
+        this.fx.screenShake(8, 300);
+        this.showDamageNumber(dmg, false);
+      } else {
+        const { width } = this.scale;
+        this.fx.shieldShimmer(width / 2, 218);
+      }
+
+      // Drain ability: enemy heals for damage dealt
+      if (this.enemy.ability === EnemyAbility.Drain && dmg > 0) {
+        const drainHeal = Math.floor(dmg * 0.5);
+        this.enemy.hp = Math.min(this.enemy.maxHp, this.enemy.hp + drainHeal);
+        this.showStatusMessage(`Drained ${drainHeal} HP!`, '#66ffcc');
+      }
+
+      // Heal ability: enemy heals on attack
+      if (this.enemy.ability === EnemyAbility.Heal) {
+        const selfHeal = Math.floor(this.enemy.maxHp * 0.1);
+        this.enemy.hp = Math.min(this.enemy.maxHp, this.enemy.hp + selfHeal);
+        this.showStatusMessage(`Enemy healed ${selfHeal} HP!`, '#2ecc71');
+      }
+
+      // Scramble ability: shuffle board
+      if (this.enemy.ability === EnemyAbility.Scramble) {
+        await this.delay(200);
+        await this.shuffleBoard();
+      }
     }
 
-    await this.delay(400);
+    await this.delay(300);
+  }
+
+  private async shuffleBoard(): Promise<void> {
+    this.showStatusMessage('Board Shuffled!', '#9b59b6');
+    this.fx.screenShake(4, 200);
+
+    // Animate all runes shrinking
+    const promises: Promise<void>[] = [];
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      for (let c = 0; c < BOARD_COLS; c++) {
+        const sprite = this.runeSprites[r]?.[c];
+        if (sprite) {
+          promises.push(new Promise(resolve => {
+            this.tweens.add({
+              targets: sprite,
+              scaleX: 0, scaleY: 0,
+              duration: 150,
+              onComplete: () => { sprite.destroy(); resolve(); },
+            });
+          }));
+        }
+      }
+    }
+    await Promise.all(promises);
+
+    // Rebuild board
+    this.board = new Board();
+    this.runeSprites = [];
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      this.runeSprites[r] = [];
+      for (let c = 0; c < BOARD_COLS; c++) {
+        const container = this.createRuneAt(r, c);
+        if (container) {
+          container.setScale(0);
+          this.tweens.add({
+            targets: container,
+            scaleX: 1, scaleY: 1,
+            duration: 200,
+            delay: (r * BOARD_COLS + c) * 10,
+          });
+        }
+        this.runeSprites[r][c] = container;
+      }
+    }
+
+    await this.delay(300);
+  }
+
+  private showStatusMessage(msg: string, color: string): void {
+    const { width } = this.scale;
+    const txt = this.add.text(width / 2, 250, msg, {
+      fontSize: '14px',
+      color,
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(200);
+
+    this.tweens.add({
+      targets: txt,
+      y: 230, alpha: 0,
+      duration: 1200, delay: 300,
+      onComplete: () => txt.destroy(),
+    });
   }
 
   private showDamageNumber(dmg: number, toEnemy: boolean): void {
     const { width } = this.scale;
     const x = toEnemy ? width / 2 + Phaser.Math.Between(-30, 30) : width / 2;
-    const y = toEnemy ? 100 : 235;
+    const y = toEnemy ? 90 : 230;
     const color = toEnemy ? '#e74c3c' : '#ff6b6b';
 
     const txt = this.add.text(x, y, `-${dmg}`, {
@@ -410,8 +625,7 @@ export class BattleScene extends Phaser.Scene {
 
     this.tweens.add({
       targets: txt,
-      y: y - 40,
-      alpha: 0,
+      y: y - 40, alpha: 0,
       duration: 800,
       onComplete: () => txt.destroy(),
     });
@@ -434,7 +648,8 @@ export class BattleScene extends Phaser.Scene {
     this.enemyHpBar.fillStyle(0x333333, 1);
     this.enemyHpBar.fillRect(width / 2 - barWidth / 2, 163, barWidth, 14);
     const enemyRatio = Math.max(0, this.enemy.hp / this.enemy.maxHp);
-    this.enemyHpBar.fillStyle(0xe74c3c, 1);
+    const hpColor = this.enemy.enraged ? 0xff4444 : 0xe74c3c;
+    this.enemyHpBar.fillStyle(hpColor, 1);
     this.enemyHpBar.fillRect(width / 2 - barWidth / 2, 163, barWidth * enemyRatio, 14);
     this.enemyHpText.setText(`${this.enemy.hp} / ${this.enemy.maxHp}`);
 
@@ -444,11 +659,18 @@ export class BattleScene extends Phaser.Scene {
     // Player HP
     this.playerHpBar.clear();
     this.playerHpBar.fillStyle(0x333333, 1);
-    this.playerHpBar.fillRect(width / 2 - barWidth / 2, 215, barWidth, 14);
+    this.playerHpBar.fillRect(width / 2 - barWidth / 2, 211, barWidth, 14);
     const playerRatio = Math.max(0, this.player.hp / this.player.maxHp);
     this.playerHpBar.fillStyle(0x2ecc71, 1);
-    this.playerHpBar.fillRect(width / 2 - barWidth / 2, 215, barWidth * playerRatio, 14);
+    this.playerHpBar.fillRect(width / 2 - barWidth / 2, 211, barWidth * playerRatio, 14);
     this.playerHpText.setText(`HP: ${this.player.hp} / ${this.player.maxHp}`);
+
+    // Status effects
+    const statuses: string[] = [];
+    if (this.enemy.enraged) statuses.push('ENRAGED');
+    if (this.enemy.ability === EnemyAbility.Poison) statuses.push('POISONED');
+    if (this.shieldBuffer > 0) statuses.push(`Shield: ${this.shieldBuffer}`);
+    this.statusText.setText(statuses.join(' | '));
   }
 
   // Animation helpers
@@ -483,7 +705,6 @@ export class BattleScene extends Phaser.Scene {
         s2.setData('col', c1);
       } else { checkDone(); }
 
-      // Swap sprite references
       this.runeSprites[r1][c1] = s2;
       this.runeSprites[r2][c2] = s1;
     });
@@ -526,8 +747,6 @@ export class BattleScene extends Phaser.Scene {
 
   private animateDrops(drops: { col: number; fromRow: number; toRow: number; type: RuneType }[]): Promise<void> {
     return new Promise((resolve) => {
-      // First, rebuild all sprites at their target positions
-      // Clear all sprites
       for (let r = 0; r < BOARD_ROWS; r++) {
         for (let c = 0; c < BOARD_COLS; c++) {
           this.runeSprites[r]?.[c]?.destroy();
