@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
   RUNE_COLORS, RuneType, CELL_SIZE,
 } from '../core/constants';
+import { BattleScene } from './BattleScene';
 
 interface EnemyDesign {
   bodyColor: number;
@@ -139,6 +140,13 @@ export class BootScene extends Phaser.Scene {
       const data = JSON.parse(saved);
       if (!data.warps) data.warps = [];
       this.registry.set('save', data);
+    }
+
+    // If mid-run, resume battle directly
+    const runSave = BattleScene.loadRunSave();
+    if (runSave) {
+      this.scene.start('Battle', { player: runSave, stage: runSave.stage });
+      return;
     }
 
     // First time: show story, otherwise go to town
