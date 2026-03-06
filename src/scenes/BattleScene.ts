@@ -69,9 +69,12 @@ export class BattleScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5, 0);
 
+    // Boss progress indicator: o-o-o-o-O
+    this.createBossProgress(width);
+
     // Modifier display
     const modData = STAGE_MODIFIERS[this.modifier];
-    this.modifierText = this.add.text(width / 2, 30, '', {
+    this.modifierText = this.add.text(width / 2, 44, '', {
       fontSize: '12px',
       color: modData.color,
     }).setOrigin(0.5, 0);
@@ -234,11 +237,11 @@ export class BattleScene extends Phaser.Scene {
 
   private createRuneLegend(width: number): void {
     const legends = [
-      { type: RuneType.Sword, label: 'ATK' },
-      { type: RuneType.Shield, label: 'DEF' },
-      { type: RuneType.Heart, label: 'HP' },
-      { type: RuneType.Star, label: 'SKL' },
-      { type: RuneType.Gold, label: 'GEM' },
+      { type: RuneType.Sword, label: '攻撃' },
+      { type: RuneType.Shield, label: '防御' },
+      { type: RuneType.Heart, label: '回復' },
+      { type: RuneType.Star, label: '技' },
+      { type: RuneType.Gold, label: '宝石' },
     ];
     const y = 260;
     const totalWidth = legends.length * 80;
@@ -518,8 +521,9 @@ export class BattleScene extends Phaser.Scene {
 
     await this.delay(1800);
 
+    this.savePersistent();
+    this.saveRunState(this.stage + 1);
     if (this.stage % 5 === 0) {
-      this.savePersistent();
       this.scene.start('Upgrade', { player: this.player, stage: this.stage + 1 });
     } else {
       this.scene.start('Battle', { player: this.player, stage: this.stage + 1 });
@@ -839,6 +843,51 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  private createBossProgress(width: number): void {
+    const posInCycle = ((this.stage - 1) % 5); // 0-4
+    const totalSteps = 5;
+    const dotSpacing = 28;
+    const totalWidth = (totalSteps - 1) * dotSpacing;
+    const startX = width / 2 - totalWidth / 2;
+    const y = 30;
+    const g = this.add.graphics();
+
+    for (let i = 0; i < totalSteps; i++) {
+      const x = startX + i * dotSpacing;
+      const isBossStep = i === totalSteps - 1;
+      const isCompleted = i < posInCycle;
+      const isCurrent = i === posInCycle;
+
+      // Draw connecting line
+      if (i > 0) {
+        const lineColor = isCompleted ? 0xf1c40f : 0x555555;
+        g.lineStyle(2, lineColor, 1);
+        g.lineBetween(x - dotSpacing + 6, y, x - 6, y);
+      }
+
+      const radius = isBossStep ? 7 : 5;
+      if (isCurrent) {
+        g.fillStyle(0xf1c40f, 1);
+        g.fillCircle(x, y, radius);
+      } else if (isCompleted) {
+        g.fillStyle(0xf1c40f, 0.6);
+        g.fillCircle(x, y, radius);
+      } else {
+        g.lineStyle(2, isBossStep ? 0xff4444 : 0x555555, 1);
+        g.strokeCircle(x, y, radius);
+      }
+
+      // Boss skull marker
+      if (isBossStep) {
+        this.add.text(x, y, 'B', {
+          fontSize: '9px',
+          color: isCurrent ? '#000000' : '#ff4444',
+          fontStyle: 'bold',
+        }).setOrigin(0.5);
+      }
+    }
+  }
+
   private savePersistent(): void {
     const save = {
       gems: this.player.gems,
@@ -848,5 +897,36 @@ export class BattleScene extends Phaser.Scene {
     };
     localStorage.setItem('rune_cascade_save', JSON.stringify(save));
     this.registry.set('save', save);
+  }
+
+  private saveRunState(nextStage: number): void {
+    const runSave = {
+      stage: nextStage,
+      hp: this.player.hp,
+      maxHp: this.player.maxHp,
+      attack: this.player.attack,
+      defense: this.player.defense,
+      gems: this.player.gems,
+      attackLevel: this.player.attackLevel,
+      defenseLevel: this.player.defenseLevel,
+      hpLevel: this.player.hpLevel,
+    };
+    localStorage.setItem('rune_cascade_run', JSON.stringify(runSave));
+  }
+
+  static clearRunSave(): void {
+    localStorage.removeItem('rune_cascade_run');
+  }
+
+  static loadRunSave(): PlayerStats & { stage: number } | null {
+    const raw = localStorage.getItem('rune_cascade_run');
+    if (!raw) return null;
+    try {
+      const data = JSON.parse(raw);
+      if (data && typeof data.stage === 'number' && data.stage > 0) {
+        return data;
+      }
+    } catch { /* ignore */ }
+    return null;
   }
 }

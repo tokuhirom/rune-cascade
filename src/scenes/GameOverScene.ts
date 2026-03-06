@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PlayerStats } from '../core/constants';
+import { BattleScene } from './BattleScene';
 
 export class GameOverScene extends Phaser.Scene {
   constructor() {
@@ -35,6 +36,7 @@ export class GameOverScene extends Phaser.Scene {
     };
     localStorage.setItem('rune_cascade_save', JSON.stringify(save));
     this.registry.set('save', save);
+    BattleScene.clearRunSave();
 
     // Retry button
     const retryBtn = this.add.text(width / 2, 360, '[ TITLE ]', {

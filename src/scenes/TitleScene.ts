@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { createInitialPlayer } from '../core/constants';
+import { BattleScene } from './BattleScene';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -43,8 +44,37 @@ export class TitleScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
 
+    let btnY = 360;
+
+    // Continue button (if run save exists)
+    const runSave = BattleScene.loadRunSave();
+    if (runSave) {
+      const continueBtn = this.add.text(width / 2, btnY, `[ CONTINUE Stage ${runSave.stage} ]`, {
+        fontSize: '24px',
+        color: '#e67e22',
+        fontStyle: 'bold',
+      }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+      continueBtn.on('pointerover', () => continueBtn.setColor('#d35400'));
+      continueBtn.on('pointerout', () => continueBtn.setColor('#e67e22'));
+      continueBtn.on('pointerdown', () => {
+        const resumePlayer = {
+          hp: runSave.hp,
+          maxHp: runSave.maxHp,
+          attack: runSave.attack,
+          defense: runSave.defense,
+          gems: runSave.gems,
+          attackLevel: runSave.attackLevel,
+          defenseLevel: runSave.defenseLevel,
+          hpLevel: runSave.hpLevel,
+        };
+        this.scene.start('Battle', { player: resumePlayer, stage: runSave.stage });
+      });
+      btnY += 50;
+    }
+
     // Start button
-    const startBtn = this.add.text(width / 2, 380, '[ START ]', {
+    const startBtn = this.add.text(width / 2, btnY, '[ NEW RUN ]', {
       fontSize: '28px',
       color: '#2ecc71',
       fontStyle: 'bold',
@@ -53,12 +83,14 @@ export class TitleScene extends Phaser.Scene {
     startBtn.on('pointerover', () => startBtn.setColor('#27ae60'));
     startBtn.on('pointerout', () => startBtn.setColor('#2ecc71'));
     startBtn.on('pointerdown', () => {
+      BattleScene.clearRunSave();
       this.scene.start('Battle', { player, stage: 1 });
     });
+    btnY += 50;
 
     // Upgrade button
     if (player.gems > 0) {
-      const upgradeBtn = this.add.text(width / 2, 440, '[ UPGRADE ]', {
+      const upgradeBtn = this.add.text(width / 2, btnY, '[ UPGRADE ]', {
         fontSize: '24px',
         color: '#3498db',
       }).setOrigin(0.5).setInteractive({ useHandCursor: true });
@@ -68,6 +100,7 @@ export class TitleScene extends Phaser.Scene {
       upgradeBtn.on('pointerdown', () => {
         this.scene.start('Upgrade', { player });
       });
+      btnY += 50;
     }
 
     // Stats display

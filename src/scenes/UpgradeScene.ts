@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PlayerStats } from '../core/constants';
+import { BattleScene } from './BattleScene';
 
 interface UpgradeOption {
   label: string;
@@ -114,6 +115,7 @@ export class UpgradeScene extends Phaser.Scene {
 
     continueBtn.on('pointerdown', () => {
       this.savePersistent(player);
+      this.saveRunState(player, nextStage);
       this.scene.start('Battle', { player, stage: nextStage });
     });
   }
@@ -127,5 +129,20 @@ export class UpgradeScene extends Phaser.Scene {
     };
     localStorage.setItem('rune_cascade_save', JSON.stringify(save));
     this.registry.set('save', save);
+  }
+
+  private saveRunState(player: PlayerStats, nextStage: number): void {
+    const runSave = {
+      stage: nextStage,
+      hp: player.hp,
+      maxHp: player.maxHp,
+      attack: player.attack,
+      defense: player.defense,
+      gems: player.gems,
+      attackLevel: player.attackLevel,
+      defenseLevel: player.defenseLevel,
+      hpLevel: player.hpLevel,
+    };
+    localStorage.setItem('rune_cascade_run', JSON.stringify(runSave));
   }
 }

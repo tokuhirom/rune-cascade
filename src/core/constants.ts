@@ -22,7 +22,7 @@ export const RUNE_COLORS: Record<RuneType, number> = {
 
 export const RUNE_SYMBOLS: Record<RuneType, string> = {
   [RuneType.Sword]: '\u2694',
-  [RuneType.Shield]: '\u26e1',
+  [RuneType.Shield]: '\u2b22',
   [RuneType.Heart]: '\u2665',
   [RuneType.Star]: '\u2605',
   [RuneType.Gold]: '\u25c6',
