@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
-import { TitleScene } from './scenes/TitleScene';
+import { StoryScene } from './scenes/StoryScene';
+import { TownScene } from './scenes/TownScene';
 import { BattleScene } from './scenes/BattleScene';
-import { UpgradeScene } from './scenes/UpgradeScene';
 import { ShopScene } from './scenes/ShopScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { VictoryScene } from './scenes/VictoryScene';
@@ -13,7 +13,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 720,
   backgroundColor: '#16213e',
   parent: 'game',
-  scene: [BootScene, TitleScene, BattleScene, UpgradeScene, ShopScene, GameOverScene, VictoryScene],
+  scene: [BootScene, StoryScene, TownScene, BattleScene, ShopScene, GameOverScene, VictoryScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

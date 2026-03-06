@@ -97,6 +97,13 @@ const ENEMY_DESIGNS: Record<string, EnemyDesign> = {
     shape: 'circle',
     features: ['hood'],
   },
+  // Fairy (town guide)
+  Fairy: {
+    bodyColor: 0x88ccff,
+    eyeColor: 0x2266ff,
+    shape: 'circle',
+    features: ['glow', 'wings_fairy'],
+  },
 };
 
 export class BootScene extends Phaser.Scene {
@@ -134,7 +141,13 @@ export class BootScene extends Phaser.Scene {
       this.registry.set('save', data);
     }
 
-    this.scene.start('Title');
+    // First time: show story, otherwise go to town
+    const storyRead = localStorage.getItem('rune_cascade_story_read');
+    if (storyRead) {
+      this.scene.start('Town');
+    } else {
+      this.scene.start('Story');
+    }
   }
 
   private generateEnemyTexture(name: string, design: EnemyDesign): void {
@@ -263,6 +276,16 @@ export class BootScene extends Phaser.Scene {
       g.fillStyle(0x440000, 0.8);
       g.fillTriangle(cx - 28, cy - 5, cx - 48, cy - 20, cx - 38, cy + 10);
       g.fillTriangle(cx + 28, cy - 5, cx + 48, cy - 20, cx + 38, cy + 10);
+    }
+
+    if (design.features.includes('wings_fairy')) {
+      // Translucent butterfly wings
+      g.fillStyle(0xaaddff, 0.4);
+      g.fillEllipse(cx - 22, cy - 8, 18, 24);
+      g.fillEllipse(cx + 22, cy - 8, 18, 24);
+      g.fillStyle(0xcceeff, 0.3);
+      g.fillEllipse(cx - 18, cy + 8, 12, 16);
+      g.fillEllipse(cx + 18, cy + 8, 12, 16);
     }
 
     if (design.features.includes('crown')) {

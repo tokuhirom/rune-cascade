@@ -60,7 +60,7 @@ export class GameOverScene extends Phaser.Scene {
     retryBtn.on('pointerover', () => retryBtn.setColor('#2980b9'));
     retryBtn.on('pointerout', () => retryBtn.setColor('#3498db'));
     retryBtn.on('pointerdown', () => {
-      this.scene.start('Title');
+      this.scene.start('Town');
     });
   }
 }

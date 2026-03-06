@@ -225,7 +225,7 @@ export class ShopScene extends Phaser.Scene {
         player.gems -= returnCost;
         this.savePersistent(player);
         BattleScene.clearRunSave();
-        this.scene.start('Title');
+        this.scene.start('Town');
       }
     });
   }
