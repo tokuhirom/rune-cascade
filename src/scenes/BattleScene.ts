@@ -510,7 +510,9 @@ export class BattleScene extends Phaser.Scene {
         }
         case RuneType.Gold: {
           const goldMult = this.modifier === StageModifier.GoldenHour ? 2 : 1;
-          const goldGain = Math.floor(count * power * goldMult);
+          const floorBonus = 1 + this.stage * 0.05;
+          const turnDecay = 1 / (1 + this.turnCount * 0.1);
+          const goldGain = Math.max(1, Math.floor(count * power * goldMult * floorBonus * turnDecay));
           this.player.gems += goldGain;
           this.fx.goldCollect(sw / 2, 248, goldGain);
           break;
