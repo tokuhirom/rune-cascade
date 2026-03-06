@@ -212,11 +212,16 @@ export class TownScene extends Phaser.Scene {
       fontSize,
       color,
       fontStyle: 'bold',
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    }).setOrigin(0.5);
 
-    btn.on('pointerover', () => btn.setColor(hoverColor));
-    btn.on('pointerout', () => btn.setColor(color));
-    btn.on('pointerdown', callback);
+    // Hit area covers the full button background
+    const hitArea = this.add.rectangle(width / 2, y + btnHeight / 2, width - 120, btnHeight)
+      .setInteractive({ useHandCursor: true })
+      .setAlpha(0.001);
+
+    hitArea.on('pointerover', () => btn.setColor(hoverColor));
+    hitArea.on('pointerout', () => btn.setColor(color));
+    hitArea.on('pointerdown', callback);
 
     return y + btnHeight + 6;
   }
