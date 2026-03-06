@@ -369,7 +369,7 @@ export class SoundManager {
     this.bgmNodes.push(cleanup);
   }
 
-  // Helper: schedule an oscillator note
+  // Helper: schedule an oscillator note (smooth fade-in/out to avoid clicks)
   private schedNote(
     freq: number, t: number, dur: number,
     type: OscillatorType = 'triangle', vol: number = 0.15,
@@ -378,30 +378,35 @@ export class SoundManager {
     const gain = this.ctx!.createGain();
     osc.type = type;
     osc.frequency.value = freq;
+    const fadeIn = Math.min(0.015, dur * 0.1);
+    const fadeOut = Math.min(0.04, dur * 0.2);
     gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(vol, t + 0.02);
-    gain.gain.setValueAtTime(vol, t + dur * 0.7);
-    gain.gain.linearRampToValueAtTime(0, t + dur * 0.95);
+    gain.gain.linearRampToValueAtTime(vol, t + fadeIn);
+    gain.gain.setValueAtTime(vol, t + dur - fadeOut);
+    gain.gain.linearRampToValueAtTime(0, t + dur);
     osc.connect(gain);
     gain.connect(this.bgmGain!);
     osc.start(t);
-    osc.stop(t + dur);
+    osc.stop(t + dur + 0.01);
     this.bgmNodes.push(osc);
   }
 
-  // Helper: schedule a bass note with staccato envelope
+  // Helper: schedule a bass note with staccato envelope (smooth edges)
   private schedBass(freq: number, t: number, dur: number, type: OscillatorType = 'square', vol: number = 0.12): void {
     const osc = this.ctx!.createOscillator();
     const gain = this.ctx!.createGain();
     osc.type = type;
     osc.frequency.value = freq;
-    gain.gain.setValueAtTime(vol, t);
-    gain.gain.setValueAtTime(vol, t + dur * 0.7);
-    gain.gain.linearRampToValueAtTime(0, t + dur * 0.9);
+    const fadeIn = Math.min(0.01, dur * 0.05);
+    const fadeOut = Math.min(0.03, dur * 0.15);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + fadeIn);
+    gain.gain.setValueAtTime(vol, t + dur - fadeOut);
+    gain.gain.linearRampToValueAtTime(0, t + dur);
     osc.connect(gain);
     gain.connect(this.bgmGain!);
     osc.start(t);
-    osc.stop(t + dur);
+    osc.stop(t + dur + 0.01);
     this.bgmNodes.push(osc);
   }
 
