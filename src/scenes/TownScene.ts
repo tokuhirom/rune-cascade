@@ -126,7 +126,15 @@ export class TownScene extends Phaser.Scene {
           buffs: runSave.buffs || { atkUp: false, defUp: false, regen: false, noHeal: false, cursedObstacles: 0 },
           gemsAtRunStart: runSave.gemsAtRunStart || 0,
         };
-        this.scene.start('Battle', { player: resumePlayer, stage: runSave.stage });
+        this.scene.start('Battle', {
+          player: resumePlayer,
+          stage: runSave.stage,
+          board: runSave.board,
+          enemy: runSave.enemy,
+          modifier: runSave.modifier,
+          shieldBuffer: runSave.shieldBuffer,
+          turnCount: runSave.turnCount,
+        });
       });
     }
 
@@ -193,6 +201,12 @@ export class TownScene extends Phaser.Scene {
         }
       }
     }
+
+    // History button
+    btnY += 5;
+    btnY = this.addButton(width, btnY, 'ADVENTURE LOG', '#88ccff', '#66aadd', () => {
+      this.scene.start('History');
+    }, true);
 
     // Build date
     const buildDate = new Date(__BUILD_TIME__).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });

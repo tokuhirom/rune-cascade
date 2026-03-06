@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PlayerStats, SaveData } from '../core/constants';
+import { PlayerStats, SaveData, addRunHistory } from '../core/constants';
 import { BattleScene } from './BattleScene';
 import { createMuteButton, soundManager } from '../core/SoundManager';
 
@@ -8,11 +8,13 @@ export class GameOverScene extends Phaser.Scene {
     super('GameOver');
   }
 
-  create(data: { player: PlayerStats; stage: number; won: boolean }): void {
+  create(data: { player: PlayerStats; stage: number; won: boolean; enemy?: string }): void {
     const { width } = this.scale;
     createMuteButton(this);
     soundManager.stopBgm();
     const { player, stage } = data;
+
+    addRunHistory({ type: 'death', floor: stage, enemy: data.enemy, timestamp: Date.now() });
 
     this.add.text(width / 2, 160, 'GAME OVER', {
       fontSize: '36px',

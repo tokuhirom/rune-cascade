@@ -24,6 +24,8 @@ export class BattleScene extends Phaser.Scene {
   private isDragging = false;
   private modifier!: StageModifier;
   private shuffleBtn?: Phaser.GameObjects.Text;
+  private hintTimer?: Phaser.Time.TimerEvent;
+  private hintTweens: Phaser.Tweens.Tween[] = [];
 
   // UI elements
   private playerHpText!: Phaser.GameObjects.Text;
@@ -42,23 +44,43 @@ export class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
-  init(data: { player: PlayerStats; stage: number }): void {
+  private savedBoard?: { grid: (number | null)[][]; cellState: number[][] };
+  private savedEnemy?: EnemyData;
+  private savedModifier?: StageModifier;
+
+  init(data: { player: PlayerStats; stage: number; board?: { grid: (number | null)[][]; cellState: number[][] }; enemy?: EnemyData; modifier?: StageModifier; shieldBuffer?: number; turnCount?: number }): void {
     this.player = data.player;
     this.stage = data.stage;
-    this.enemy = generateEnemy(this.stage);
     this.isProcessing = false;
-    this.shieldBuffer = 0;
     this.comboCount = 0;
-    this.turnCount = 0;
     this.runeSprites = [];
     this.dragStartCell = null;
     this.isDragging = false;
-    this.modifier = rollStageModifier(this.stage);
+
+    // Restore or generate battle state
+    this.savedBoard = data.board;
+    this.savedEnemy = data.enemy;
+    this.savedModifier = data.modifier;
+    this.shieldBuffer = data.shieldBuffer ?? 0;
+    this.turnCount = data.turnCount ?? 0;
+    this.enemy = data.enemy ?? generateEnemy(this.stage);
+    this.modifier = data.modifier ?? rollStageModifier(this.stage);
   }
 
   create(): void {
     const { width } = this.scale;
-    this.board = new Board();
+    if (this.savedBoard) {
+      this.board = new Board();
+      for (let r = 0; r < BOARD_ROWS; r++) {
+        for (let c = 0; c < BOARD_COLS; c++) {
+          this.board.grid[r][c] = this.savedBoard.grid[r][c] as RuneType | null;
+          this.board.cellState[r][c] = this.savedBoard.cellState[r][c] as CellState;
+        }
+      }
+      this.savedBoard = undefined;
+    } else {
+      this.board = new Board();
+    }
     this.fx = new Effects(this);
 
     const isBoss = this.stage % 5 === 0;
@@ -157,9 +179,13 @@ export class BattleScene extends Phaser.Scene {
     // Create board sprites
     this.createBoardSprites();
 
+    // Start hint timer
+    this.resetHintTimer();
+
     // Drag-based input
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
       if (this.isProcessing) return;
+      this.resetHintTimer();
       const cell = this.pointerToCell(ptr.x, ptr.y);
       if (!cell) return;
       this.dragStartCell = cell;
@@ -420,6 +446,46 @@ export class BattleScene extends Phaser.Scene {
     sprite.setScale(on ? 1.15 : 1);
   }
 
+  private resetHintTimer(): void {
+    this.clearHint();
+    this.hintTimer?.remove();
+    this.hintTimer = this.time.delayedCall(30000, () => {
+      this.showHint();
+    });
+  }
+
+  private clearHint(): void {
+    for (const tw of this.hintTweens) {
+      tw.stop();
+      const target = tw.targets?.[0] as Phaser.GameObjects.Container | undefined;
+      if (target) target.setScale(1);
+    }
+    this.hintTweens = [];
+  }
+
+  private showHint(): void {
+    this.clearHint();
+    if (this.isProcessing) return;
+    const moves = this.board.findValidMoves();
+    if (moves.length === 0) return;
+    // Highlight the first valid move pair
+    const [r1, c1, r2, c2] = moves[0];
+    for (const [r, c] of [[r1, c1], [r2, c2]]) {
+      const sprite = this.runeSprites[r]?.[c];
+      if (!sprite) continue;
+      const tw = this.tweens.add({
+        targets: sprite,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        duration: 500,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      this.hintTweens.push(tw);
+    }
+  }
+
   private getEffectiveAttack(): number {
     return this.player.buffs.atkUp ? Math.floor(this.player.attack * 1.5) : this.player.attack;
   }
@@ -451,6 +517,11 @@ export class BattleScene extends Phaser.Scene {
     }
 
     await this.processCascades();
+
+    // Auto-shuffle if no valid moves remain
+    if (this.enemy.hp > 0 && this.player.hp > 0 && !this.board.hasValidMove()) {
+      await this.shuffleBoard();
+    }
 
     this.turnCount++;
 
@@ -493,10 +564,12 @@ export class BattleScene extends Phaser.Scene {
           player: this.player,
           stage: this.stage,
           won: false,
+          enemy: this.enemy.name,
         });
       });
     } else {
       this.saveRunState(this.stage);
+      this.resetHintTimer();
     }
 
     this.isProcessing = false;
@@ -818,6 +891,12 @@ export class BattleScene extends Phaser.Scene {
     // Freeze / Obstacle
     await this.placeSpecialBlocks();
 
+    // Auto-shuffle if no valid moves after enemy abilities
+    if (this.player.hp > 0 && !this.board.hasValidMove()) {
+      await this.delay(200);
+      await this.shuffleBoard();
+    }
+
     await this.delay(300);
   }
 
@@ -843,7 +922,13 @@ export class BattleScene extends Phaser.Scene {
     }
     await Promise.all(promises);
 
-    this.board = new Board();
+    // Shuffle only normal runes, preserving special cells (Frozen, Obstacle, RowClear)
+    this.board.shuffleNormalRunes();
+    let retries = 0;
+    while (!this.board.hasValidMove() && retries < 10) {
+      this.board.shuffleNormalRunes();
+      retries++;
+    }
     this.runeSprites = [];
     for (let r = 0; r < BOARD_ROWS; r++) {
       this.runeSprites[r] = [];
@@ -1292,11 +1377,23 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private saveRunState(stage: number): void {
-    BattleScene.saveRunStateStatic(this.player, stage);
+    BattleScene.saveRunStateStatic(this.player, stage, {
+      board: { grid: this.board.grid, cellState: this.board.cellState },
+      enemy: this.enemy,
+      modifier: this.modifier,
+      shieldBuffer: this.shieldBuffer,
+      turnCount: this.turnCount,
+    });
   }
 
-  static saveRunStateStatic(player: PlayerStats, stage: number): void {
-    const runSave = {
+  static saveRunStateStatic(player: PlayerStats, stage: number, extra?: {
+    board?: { grid: (number | null)[][]; cellState: number[][] };
+    enemy?: EnemyData;
+    modifier?: StageModifier;
+    shieldBuffer?: number;
+    turnCount?: number;
+  }): void {
+    const runSave: Record<string, unknown> = {
       stage,
       hp: player.hp,
       maxHp: player.maxHp,
@@ -1310,6 +1407,13 @@ export class BattleScene extends Phaser.Scene {
       buffs: player.buffs,
       gemsAtRunStart: player.gemsAtRunStart,
     };
+    if (extra) {
+      if (extra.board) runSave.board = extra.board;
+      if (extra.enemy) runSave.enemy = extra.enemy;
+      if (extra.modifier !== undefined) runSave.modifier = extra.modifier;
+      if (extra.shieldBuffer !== undefined) runSave.shieldBuffer = extra.shieldBuffer;
+      if (extra.turnCount !== undefined) runSave.turnCount = extra.turnCount;
+    }
     localStorage.setItem('rune_cascade_run', JSON.stringify(runSave));
   }
 
@@ -1317,7 +1421,7 @@ export class BattleScene extends Phaser.Scene {
     localStorage.removeItem('rune_cascade_run');
   }
 
-  static loadRunSave(): PlayerStats & { stage: number } | null {
+  static loadRunSave(): PlayerStats & { stage: number; board?: { grid: (number | null)[][]; cellState: number[][] }; enemy?: EnemyData; modifier?: StageModifier; shieldBuffer?: number; turnCount?: number } | null {
     const raw = localStorage.getItem('rune_cascade_run');
     if (!raw) return null;
     try {

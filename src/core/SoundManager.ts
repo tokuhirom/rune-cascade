@@ -8,8 +8,10 @@ export class SoundManager {
   private bgmGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private bgmNodes: AudioNode[] = [];
+  private bgmTimers: ReturnType<typeof setTimeout>[] = [];
   private bgmPlaying = false;
   private bgmTrack: string = '';
+  private bgmGeneration = 0;
   private muted = false;
 
   init(): void {
@@ -318,6 +320,7 @@ export class SoundManager {
     // Always stop and restart to prevent layer stacking across scene transitions
     this.stopBgm();
     this.ensureContext();
+    this.bgmGeneration++;
     this.bgmPlaying = true;
     this.bgmTrack = track;
     this.scheduleBgmLoop();
@@ -331,6 +334,13 @@ export class SoundManager {
   stopBgm(): void {
     this.bgmPlaying = false;
     this.bgmTrack = '';
+    this.bgmGeneration++;
+    // Clear all pending loop timers
+    for (const t of this.bgmTimers) {
+      clearTimeout(t);
+    }
+    this.bgmTimers = [];
+    // Stop all scheduled audio nodes
     for (const node of this.bgmNodes) {
       try {
         if (node instanceof AudioScheduledSourceNode) {
@@ -347,6 +357,7 @@ export class SoundManager {
     if (!this.ctx || !this.bgmGain || !this.bgmPlaying) return;
 
     const now = this.ctx.currentTime;
+    const gen = this.bgmGeneration;
     let loopDur: number;
 
     switch (this.bgmTrack) {
@@ -360,13 +371,13 @@ export class SoundManager {
     }
 
     const timerId = setTimeout(() => {
-      if (this.bgmPlaying) {
+      // Only continue if this is still the same BGM session
+      if (this.bgmPlaying && this.bgmGeneration === gen) {
         this.bgmNodes = [];
         this.scheduleBgmLoop();
       }
     }, (loopDur - 0.1) * 1000);
-    const cleanup = { stop: () => clearTimeout(timerId) } as unknown as AudioScheduledSourceNode;
-    this.bgmNodes.push(cleanup);
+    this.bgmTimers.push(timerId);
   }
 
   // Helper: schedule an oscillator note (smooth fade-in/out to avoid clicks)

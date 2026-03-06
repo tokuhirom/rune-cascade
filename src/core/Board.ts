@@ -254,6 +254,67 @@ export class Board {
     return [r, c];
   }
 
+  // Shuffle only normal (non-special) runes in place, preserving Frozen/Obstacle/RowClear cells
+  shuffleNormalRunes(): void {
+    const positions: [number, number][] = [];
+    const runes: RuneType[] = [];
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      for (let c = 0; c < BOARD_COLS; c++) {
+        if (this.cellState[r][c] === CellState.Normal && this.grid[r][c] !== null) {
+          positions.push([r, c]);
+          runes.push(this.grid[r][c]!);
+        }
+      }
+    }
+    // Fisher-Yates shuffle
+    for (let i = runes.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [runes[i], runes[j]] = [runes[j], runes[i]];
+    }
+    for (let i = 0; i < positions.length; i++) {
+      const [r, c] = positions[i];
+      this.grid[r][c] = runes[i];
+    }
+    // Remove any matches created by shuffle
+    let matches = this.findMatches();
+    while (matches.length > 0) {
+      for (const match of matches) {
+        for (const [r, c] of match.positions) {
+          this.grid[r][c] = this.randomRune();
+        }
+      }
+      matches = this.findMatches();
+    }
+  }
+
+  // Find all valid swap pairs that would create a match
+  findValidMoves(): [number, number, number, number][] {
+    const moves: [number, number, number, number][] = [];
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      for (let c = 0; c < BOARD_COLS; c++) {
+        if (!this.canSwap(r, c)) continue;
+        // Try swap right
+        if (c + 1 < BOARD_COLS && this.canSwap(r, c + 1)) {
+          this.swap(r, c, r, c + 1);
+          if (this.findMatches().length > 0) moves.push([r, c, r, c + 1]);
+          this.swap(r, c, r, c + 1);
+        }
+        // Try swap down
+        if (r + 1 < BOARD_ROWS && this.canSwap(r + 1, c)) {
+          this.swap(r, c, r + 1, c);
+          if (this.findMatches().length > 0) moves.push([r, c, r + 1, c]);
+          this.swap(r, c, r + 1, c);
+        }
+      }
+    }
+    return moves;
+  }
+
+  // Check if any valid swap exists that would create a match
+  hasValidMove(): boolean {
+    return this.findValidMoves().length > 0;
+  }
+
   // Returns array of {col, fromRow, toRow} for animations.
   // Includes ALL runes (moved, stationary, and new) so animateDrops can rebuild all sprites.
   applyGravity(): { col: number; fromRow: number; toRow: number; type: RuneType; state: CellState }[] {

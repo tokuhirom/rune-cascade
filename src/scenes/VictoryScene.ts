@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PlayerStats, SaveData } from '../core/constants';
+import { PlayerStats, SaveData, addRunHistory } from '../core/constants';
 import { BattleScene } from './BattleScene';
 import { createMuteButton, soundManager } from '../core/SoundManager';
 
@@ -166,6 +166,7 @@ export class VictoryScene extends Phaser.Scene {
     // Save with gems kept
     this.savePersistent();
     BattleScene.clearRunSave();
+    addRunHistory({ type: 'victory', floor: this.stage, timestamp: Date.now() });
 
     const titleBtn = this.add.text(width / 2, 470, '[ RETURN TO TOWN ]', {
       fontSize: '22px',

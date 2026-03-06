@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PlayerStats, SaveData, WARP_FLOORS } from '../core/constants';
+import { PlayerStats, SaveData, WARP_FLOORS, addRunHistory } from '../core/constants';
 import { BattleScene } from './BattleScene';
 import { createMuteButton, soundManager } from '../core/SoundManager';
 
@@ -419,6 +419,7 @@ export class ShopScene extends Phaser.Scene {
         player.gems -= returnCost;
         this.savePersistent(player);
         BattleScene.clearRunSave();
+        addRunHistory({ type: 'return', floor: data.stage, timestamp: Date.now() });
         this.scene.start('Town');
       }
     });

@@ -75,6 +75,29 @@ export interface SaveData {
   warps: number[];
 }
 
+export interface RunHistoryEntry {
+  type: 'death' | 'return' | 'victory';
+  floor: number;
+  enemy?: string;
+  timestamp: number;
+}
+
+const HISTORY_KEY = 'rune_cascade_history';
+const MAX_HISTORY = 20;
+
+export function addRunHistory(entry: RunHistoryEntry): void {
+  const raw = localStorage.getItem(HISTORY_KEY);
+  const history: RunHistoryEntry[] = raw ? JSON.parse(raw) : [];
+  history.unshift(entry);
+  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY;
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+export function getRunHistory(): RunHistoryEntry[] {
+  const raw = localStorage.getItem(HISTORY_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
 // Enemy ability types
 export enum EnemyAbility {
   None = 'none',
