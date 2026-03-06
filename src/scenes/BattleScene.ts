@@ -75,8 +75,9 @@ export class BattleScene extends Phaser.Scene {
     // Modifier display
     const modData = STAGE_MODIFIERS[this.modifier];
     this.modifierText = this.add.text(width / 2, 44, '', {
-      fontSize: '12px',
+      fontSize: '13px',
       color: modData.color,
+      fontStyle: 'bold',
     }).setOrigin(0.5, 0);
     if (this.modifier !== StageModifier.None) {
       this.modifierText.setText(`[${modData.name}] ${modData.desc}`);
@@ -93,8 +94,9 @@ export class BattleScene extends Phaser.Scene {
 
     // Enemy ability
     this.enemyAbilityText = this.add.text(width / 2, 150, '', {
-      fontSize: '11px',
+      fontSize: '12px',
       color: '#e67e22',
+      fontStyle: 'bold',
     }).setOrigin(0.5);
     if (this.enemy.ability !== EnemyAbility.None) {
       this.enemyAbilityText.setText(this.enemy.abilityDesc);
@@ -103,27 +105,31 @@ export class BattleScene extends Phaser.Scene {
     // Enemy HP bar
     this.enemyHpBar = this.add.graphics();
     this.enemyHpText = this.add.text(width / 2, 170, '', {
-      fontSize: '13px',
+      fontSize: '14px',
       color: '#ffffff',
+      fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Enemy timer
     this.enemyTimerText = this.add.text(width / 2, 190, '', {
-      fontSize: '14px',
+      fontSize: '15px',
       color: '#e67e22',
+      fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Player HP bar
     this.playerHpBar = this.add.graphics();
     this.playerHpText = this.add.text(width / 2, 218, '', {
-      fontSize: '13px',
+      fontSize: '14px',
       color: '#ffffff',
+      fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Status effects
     this.statusText = this.add.text(width / 2, 236, '', {
-      fontSize: '11px',
+      fontSize: '12px',
       color: '#bb88ff',
+      fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Rune legend
@@ -222,8 +228,11 @@ export class BattleScene extends Phaser.Scene {
 
     const img = this.add.image(0, 0, `rune_${type}`);
     const symbol = this.add.text(0, 0, RUNE_SYMBOLS[type], {
-      fontSize: '22px',
+      fontSize: '24px',
       color: '#ffffff',
+      fontStyle: 'bold',
+      stroke: '#000000',
+      strokeThickness: 2,
     }).setOrigin(0.5);
 
     const container = this.add.container(x, y, [img, symbol]);
@@ -237,11 +246,11 @@ export class BattleScene extends Phaser.Scene {
 
   private createRuneLegend(width: number): void {
     const legends = [
-      { type: RuneType.Sword, label: '攻撃' },
-      { type: RuneType.Shield, label: '防御' },
-      { type: RuneType.Heart, label: '回復' },
-      { type: RuneType.Star, label: '技' },
-      { type: RuneType.Gold, label: '宝石' },
+      { type: RuneType.Sword, label: 'ATK' },
+      { type: RuneType.Shield, label: 'DEF' },
+      { type: RuneType.Heart, label: 'HP' },
+      { type: RuneType.Star, label: 'SKL' },
+      { type: RuneType.Gold, label: 'GEM' },
     ];
     const y = 260;
     const totalWidth = legends.length * 80;
@@ -259,14 +268,16 @@ export class BattleScene extends Phaser.Scene {
 
       // Symbol
       this.add.text(x - 20, y, RUNE_SYMBOLS[type], {
-        fontSize: '11px',
+        fontSize: '12px',
         color: '#ffffff',
+        fontStyle: 'bold',
       }).setOrigin(0.5);
 
       // Label
       this.add.text(x + 2, y, label, {
-        fontSize: '11px',
-        color: '#888888',
+        fontSize: '12px',
+        color: '#aaaaaa',
+        fontStyle: 'bold',
       }).setOrigin(0, 0.5);
     }
   }
@@ -322,6 +333,7 @@ export class BattleScene extends Phaser.Scene {
 
     // Check player death
     if (this.player.hp <= 0) {
+      BattleScene.clearRunSave();
       this.time.delayedCall(500, () => {
         this.scene.start('GameOver', {
           player: this.player,
@@ -329,6 +341,9 @@ export class BattleScene extends Phaser.Scene {
           won: false,
         });
       });
+    } else {
+      // Save run state after each turn
+      this.saveRunState(this.stage);
     }
 
     this.isProcessing = false;
