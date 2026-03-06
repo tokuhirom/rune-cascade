@@ -315,8 +315,7 @@ export class SoundManager {
 
   startBgm(track: string): void {
     if (!this.ctx || !this.bgmGain) return;
-    // Don't restart if same track is already playing
-    if (this.bgmPlaying && this.bgmTrack === track) return;
+    // Always stop and restart to prevent layer stacking across scene transitions
     this.stopBgm();
     this.ensureContext();
     this.bgmPlaying = true;
