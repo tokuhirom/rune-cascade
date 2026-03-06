@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { createInitialPlayer, SaveData, WARP_FLOORS, PlayerStats } from '../core/constants';
 import { BattleScene } from './BattleScene';
-import { createMuteButton } from '../core/SoundManager';
+import { createMuteButton, soundManager } from '../core/SoundManager';
 
 declare const __BUILD_TIME__: number;
 
@@ -38,6 +38,7 @@ export class TownScene extends Phaser.Scene {
     bg.fillRect(0, height * 0.6, width, height * 0.4);
 
     createMuteButton(this);
+    soundManager.startBgm('town');
 
     // Title
     this.add.text(width / 2, 25, 'RUNE CASCADE', {

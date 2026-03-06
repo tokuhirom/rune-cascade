@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PlayerStats, SaveData, WARP_FLOORS } from '../core/constants';
 import { BattleScene } from './BattleScene';
-import { createMuteButton } from '../core/SoundManager';
+import { createMuteButton, soundManager } from '../core/SoundManager';
 
 type Rarity = 'common' | 'rare' | 'epic' | 'cursed';
 
@@ -37,6 +37,7 @@ export class ShopScene extends Phaser.Scene {
     }
 
     createMuteButton(this);
+    soundManager.startBgm('shop');
 
     // Title
     this.add.text(width / 2, 20, `B${data.stage}F - Rest Point`, {

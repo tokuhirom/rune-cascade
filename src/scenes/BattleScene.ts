@@ -201,8 +201,16 @@ export class BattleScene extends Phaser.Scene {
     // Mute toggle button (top-right)
     createMuteButton(this);
 
-    // Start BGM
-    soundManager.startBattleBgm();
+    // Start BGM (different tracks for boss types)
+    if (this.stage === 100) {
+      soundManager.startBgm('finalboss');
+    } else if (isMidBoss) {
+      soundManager.startBgm('midboss');
+    } else if (isBoss) {
+      soundManager.startBgm('boss');
+    } else {
+      soundManager.startBgm('battle');
+    }
   }
 
   private pointerToCell(x: number, y: number): [number, number] | null {

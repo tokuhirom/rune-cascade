@@ -9,6 +9,7 @@ export class SoundManager {
   private sfxGain: GainNode | null = null;
   private bgmNodes: AudioNode[] = [];
   private bgmPlaying = false;
+  private bgmTrack: string = '';
   private muted = false;
 
   init(): void {
@@ -25,6 +26,15 @@ export class SoundManager {
       this.sfxGain = this.ctx.createGain();
       this.sfxGain.gain.value = 0.6;
       this.sfxGain.connect(this.masterGain);
+
+      // Pause BGM when tab/screen is hidden (phone lock, tab switch)
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          this.ctx?.suspend();
+        } else {
+          this.ctx?.resume();
+        }
+      });
     } catch {
       // Web Audio not available
     }
@@ -303,15 +313,25 @@ export class SoundManager {
 
   // --- BGM ---
 
-  startBattleBgm(): void {
-    if (!this.ctx || !this.bgmGain || this.bgmPlaying) return;
+  startBgm(track: string): void {
+    if (!this.ctx || !this.bgmGain) return;
+    // Don't restart if same track is already playing
+    if (this.bgmPlaying && this.bgmTrack === track) return;
+    this.stopBgm();
     this.ensureContext();
     this.bgmPlaying = true;
-    this.playBgmLoop();
+    this.bgmTrack = track;
+    this.scheduleBgmLoop();
+  }
+
+  /** Convenience alias for battle BGM */
+  startBattleBgm(): void {
+    this.startBgm('battle');
   }
 
   stopBgm(): void {
     this.bgmPlaying = false;
+    this.bgmTrack = '';
     for (const node of this.bgmNodes) {
       try {
         if (node instanceof AudioScheduledSourceNode) {
@@ -324,134 +344,461 @@ export class SoundManager {
     this.bgmNodes = [];
   }
 
-  private playBgmLoop(): void {
+  private scheduleBgmLoop(): void {
     if (!this.ctx || !this.bgmGain || !this.bgmPlaying) return;
 
     const now = this.ctx.currentTime;
-    const bpm = 140;
-    const beatDur = 60 / bpm;
-    const barDur = beatDur * 4;
-    const loopBars = 4;
-    const loopDur = barDur * loopBars;
+    let loopDur: number;
 
-    // Bass line (driving rhythm)
-    const bassNotes = [
-      // Bar 1: Am
-      { note: 220, time: 0 }, { note: 220, time: beatDur },
-      { note: 330, time: beatDur * 2 }, { note: 220, time: beatDur * 3 },
-      // Bar 2: F
-      { note: 175, time: barDur }, { note: 175, time: barDur + beatDur },
-      { note: 262, time: barDur + beatDur * 2 }, { note: 175, time: barDur + beatDur * 3 },
-      // Bar 3: G
-      { note: 196, time: barDur * 2 }, { note: 196, time: barDur * 2 + beatDur },
-      { note: 294, time: barDur * 2 + beatDur * 2 }, { note: 196, time: barDur * 2 + beatDur * 3 },
-      // Bar 4: E
-      { note: 165, time: barDur * 3 }, { note: 165, time: barDur * 3 + beatDur },
-      { note: 247, time: barDur * 3 + beatDur * 2 }, { note: 330, time: barDur * 3 + beatDur * 3 },
-    ];
-
-    for (const { note, time } of bassNotes) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = note;
-      const t = now + time;
-      gain.gain.setValueAtTime(0.12, t);
-      gain.gain.setValueAtTime(0.12, t + beatDur * 0.7);
-      gain.gain.linearRampToValueAtTime(0, t + beatDur * 0.9);
-      osc.connect(gain);
-      gain.connect(this.bgmGain!);
-      osc.start(t);
-      osc.stop(t + beatDur);
-      this.bgmNodes.push(osc);
+    switch (this.bgmTrack) {
+      case 'town': loopDur = this.playTownBgm(now); break;
+      case 'shop': loopDur = this.playShopBgm(now); break;
+      case 'boss': loopDur = this.playBossBgm(now); break;
+      case 'midboss': loopDur = this.playMidBossBgm(now); break;
+      case 'finalboss': loopDur = this.playFinalBossBgm(now); break;
+      case 'ending': loopDur = this.playEndingBgm(now); break;
+      default: loopDur = this.playBattleBgm(now); break;
     }
 
-    // Melody (chiptune lead)
-    const melodyNotes = [
-      // Bar 1
-      { note: 880, time: 0, dur: beatDur * 0.5 },
-      { note: 784, time: beatDur * 0.5, dur: beatDur * 0.5 },
-      { note: 660, time: beatDur, dur: beatDur },
-      { note: 784, time: beatDur * 2, dur: beatDur * 0.5 },
-      { note: 880, time: beatDur * 2.5, dur: beatDur * 0.5 },
-      { note: 1047, time: beatDur * 3, dur: beatDur },
-      // Bar 2
-      { note: 880, time: barDur, dur: beatDur },
-      { note: 784, time: barDur + beatDur, dur: beatDur * 0.5 },
-      { note: 660, time: barDur + beatDur * 1.5, dur: beatDur * 0.5 },
-      { note: 698, time: barDur + beatDur * 2, dur: beatDur * 2 },
-      // Bar 3
-      { note: 784, time: barDur * 2, dur: beatDur * 0.5 },
-      { note: 880, time: barDur * 2 + beatDur * 0.5, dur: beatDur * 0.5 },
-      { note: 988, time: barDur * 2 + beatDur, dur: beatDur },
-      { note: 880, time: barDur * 2 + beatDur * 2, dur: beatDur * 0.5 },
-      { note: 784, time: barDur * 2 + beatDur * 2.5, dur: beatDur * 0.5 },
-      { note: 660, time: barDur * 2 + beatDur * 3, dur: beatDur },
-      // Bar 4
-      { note: 784, time: barDur * 3, dur: beatDur },
-      { note: 660, time: barDur * 3 + beatDur, dur: beatDur * 0.5 },
-      { note: 784, time: barDur * 3 + beatDur * 1.5, dur: beatDur * 0.5 },
-      { note: 880, time: barDur * 3 + beatDur * 2, dur: beatDur * 2 },
-    ];
-
-    for (const { note, time, dur } of melodyNotes) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.value = note;
-      const t = now + time;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.15, t + 0.02);
-      gain.gain.setValueAtTime(0.15, t + dur * 0.7);
-      gain.gain.linearRampToValueAtTime(0, t + dur * 0.95);
-      osc.connect(gain);
-      gain.connect(this.bgmGain!);
-      osc.start(t);
-      osc.stop(t + dur);
-      this.bgmNodes.push(osc);
-    }
-
-    // Percussion (hi-hat style on every 8th note)
-    for (let i = 0; i < loopBars * 8; i++) {
-      const t = now + i * (beatDur / 2);
-      const isDownbeat = i % 2 === 0;
-      const bufLen = Math.floor(this.ctx.sampleRate * 0.03);
-      const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let j = 0; j < bufLen; j++) {
-        d[j] = (Math.random() * 2 - 1) * (1 - j / bufLen);
-      }
-      const src = this.ctx.createBufferSource();
-      src.buffer = buf;
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(isDownbeat ? 0.08 : 0.04, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-
-      // Hi-pass filter for tinny hat sound
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.value = 8000;
-
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.bgmGain!);
-      src.start(t);
-      src.stop(t + 0.05);
-      this.bgmNodes.push(src);
-    }
-
-    // Schedule next loop
-    const scheduleNext = () => {
+    const timerId = setTimeout(() => {
       if (this.bgmPlaying) {
-        // Clean up old nodes
         this.bgmNodes = [];
-        this.playBgmLoop();
+        this.scheduleBgmLoop();
       }
-    };
-    const timerId = setTimeout(scheduleNext, (loopDur - 0.1) * 1000);
-    // Store cleanup reference
+    }, (loopDur - 0.1) * 1000);
     const cleanup = { stop: () => clearTimeout(timerId) } as unknown as AudioScheduledSourceNode;
     this.bgmNodes.push(cleanup);
+  }
+
+  // Helper: schedule an oscillator note
+  private schedNote(
+    freq: number, t: number, dur: number,
+    type: OscillatorType = 'triangle', vol: number = 0.15,
+  ): void {
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + 0.02);
+    gain.gain.setValueAtTime(vol, t + dur * 0.7);
+    gain.gain.linearRampToValueAtTime(0, t + dur * 0.95);
+    osc.connect(gain);
+    gain.connect(this.bgmGain!);
+    osc.start(t);
+    osc.stop(t + dur);
+    this.bgmNodes.push(osc);
+  }
+
+  // Helper: schedule a bass note with staccato envelope
+  private schedBass(freq: number, t: number, dur: number, type: OscillatorType = 'square', vol: number = 0.12): void {
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.setValueAtTime(vol, t + dur * 0.7);
+    gain.gain.linearRampToValueAtTime(0, t + dur * 0.9);
+    osc.connect(gain);
+    gain.connect(this.bgmGain!);
+    osc.start(t);
+    osc.stop(t + dur);
+    this.bgmNodes.push(osc);
+  }
+
+  // Helper: hi-hat percussion
+  private schedHiHat(t: number, loud: boolean = false): void {
+    const bufLen = Math.floor(this.ctx!.sampleRate * 0.03);
+    const buf = this.ctx!.createBuffer(1, bufLen, this.ctx!.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let j = 0; j < bufLen; j++) {
+      d[j] = (Math.random() * 2 - 1) * (1 - j / bufLen);
+    }
+    const src = this.ctx!.createBufferSource();
+    src.buffer = buf;
+    const gain = this.ctx!.createGain();
+    gain.gain.setValueAtTime(loud ? 0.08 : 0.04, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    const filter = this.ctx!.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 8000;
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.bgmGain!);
+    src.start(t);
+    src.stop(t + 0.05);
+    this.bgmNodes.push(src);
+  }
+
+  // Helper: kick drum
+  private schedKick(t: number, vol: number = 0.2): void {
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(gain);
+    gain.connect(this.bgmGain!);
+    osc.start(t);
+    osc.stop(t + 0.25);
+    this.bgmNodes.push(osc);
+  }
+
+  // === Normal Battle BGM (Am-F-G-E, 140bpm, energetic chiptune) ===
+  private playBattleBgm(now: number): number {
+    const bpm = 140;
+    const beat = 60 / bpm;
+    const bar = beat * 4;
+    const loopDur = bar * 4;
+
+    // Bass
+    const bass = [
+      [220, 0], [220, beat], [330, beat*2], [220, beat*3],
+      [175, bar], [175, bar+beat], [262, bar+beat*2], [175, bar+beat*3],
+      [196, bar*2], [196, bar*2+beat], [294, bar*2+beat*2], [196, bar*2+beat*3],
+      [165, bar*3], [165, bar*3+beat], [247, bar*3+beat*2], [330, bar*3+beat*3],
+    ];
+    for (const [n, t] of bass) this.schedBass(n, now+t, beat);
+
+    // Melody
+    const mel: [number, number, number][] = [
+      [880, 0, beat*0.5], [784, beat*0.5, beat*0.5], [660, beat, beat],
+      [784, beat*2, beat*0.5], [880, beat*2.5, beat*0.5], [1047, beat*3, beat],
+      [880, bar, beat], [784, bar+beat, beat*0.5], [660, bar+beat*1.5, beat*0.5],
+      [698, bar+beat*2, beat*2],
+      [784, bar*2, beat*0.5], [880, bar*2+beat*0.5, beat*0.5], [988, bar*2+beat, beat],
+      [880, bar*2+beat*2, beat*0.5], [784, bar*2+beat*2.5, beat*0.5], [660, bar*2+beat*3, beat],
+      [784, bar*3, beat], [660, bar*3+beat, beat*0.5], [784, bar*3+beat*1.5, beat*0.5],
+      [880, bar*3+beat*2, beat*2],
+    ];
+    for (const [n, t, d] of mel) this.schedNote(n, now+t, d);
+
+    // Hi-hats on 8th notes
+    for (let i = 0; i < 32; i++) this.schedHiHat(now + i * beat/2, i%2===0);
+
+    return loopDur;
+  }
+
+  // === Town BGM (Gentle waltz, 3/4 time, C-Am-F-G, dreamy) ===
+  private playTownBgm(now: number): number {
+    const bpm = 90;
+    const beat = 60 / bpm;
+    const bar = beat * 3; // 3/4 time waltz
+    const loopDur = bar * 8;
+
+    // Gentle bass (root notes, soft triangle wave)
+    const bassPattern: [number, number][] = [
+      // C-Am-F-G repeated twice
+      [131, 0], [131, bar], [110, bar*2], [110, bar*3],
+      [175, bar*4], [175, bar*5], [196, bar*6], [196, bar*7],
+    ];
+    for (const [n, t] of bassPattern) {
+      this.schedBass(n, now+t, bar*0.9, 'triangle', 0.1);
+    }
+
+    // Waltz chords (oom-pah-pah pattern)
+    const chords: [number[], number][] = [
+      [[262, 330, 392], 0], [[262, 330, 392], bar],     // C
+      [[220, 262, 330], bar*2], [[220, 262, 330], bar*3], // Am
+      [[175, 220, 262], bar*4], [[175, 220, 262], bar*5], // F
+      [[196, 247, 294], bar*6], [[196, 247, 294], bar*7], // G
+    ];
+    for (const [freqs, barStart] of chords) {
+      for (let b = 1; b < 3; b++) {
+        const t = now + barStart + b * beat;
+        for (const f of freqs) {
+          this.schedNote(f, t, beat * 0.6, 'sine', 0.06);
+        }
+      }
+    }
+
+    // Dreamy melody (high register, sine wave)
+    const melody: [number, number, number][] = [
+      // Phrase 1 (bars 0-3)
+      [784, 0, beat], [880, beat, beat], [784, beat*2, beat*0.5],
+      [660, bar+beat*0.5, beat*1.5], [784, bar+beat*2, beat],
+      [880, bar*2, beat*2], [784, bar*2+beat*2, beat],
+      [660, bar*3, beat], [784, bar*3+beat, beat], [880, bar*3+beat*2, beat],
+      // Phrase 2 (bars 4-7)
+      [1047, bar*4, beat*1.5], [880, bar*4+beat*1.5, beat*0.5], [784, bar*4+beat*2, beat],
+      [880, bar*5, beat], [784, bar*5+beat, beat*0.5], [660, bar*5+beat*1.5, beat*1.5],
+      [784, bar*6, beat*2], [880, bar*6+beat*2, beat],
+      [1047, bar*7, beat*2], [784, bar*7+beat*2, beat],
+    ];
+    for (const [n, t, d] of melody) this.schedNote(n, now+t, d, 'sine', 0.12);
+
+    // Sparkle arpeggios (fairy dust feel)
+    for (let i = 0; i < 8; i++) {
+      const t = now + i * bar + beat * 0.5;
+      this.schedNote(1568, t, beat*0.3, 'sine', 0.04);
+      this.schedNote(1976, t + beat*0.3, beat*0.3, 'sine', 0.03);
+    }
+
+    return loopDur;
+  }
+
+  // === Shop BGM (Bouncy, mysterious merchant vibe, Em-Bb-Am-B7) ===
+  private playShopBgm(now: number): number {
+    const bpm = 110;
+    const beat = 60 / bpm;
+    const bar = beat * 4;
+    const loopDur = bar * 4;
+
+    // Walking bass line
+    const bass: [number, number][] = [
+      [165, 0], [196, beat], [220, beat*2], [196, beat*3],
+      [147, bar], [165, bar+beat], [175, bar+beat*2], [165, bar+beat*3],
+      [110, bar*2], [131, bar*2+beat], [147, bar*2+beat*2], [165, bar*2+beat*3],
+      [124, bar*3], [147, bar*3+beat], [156, bar*3+beat*2], [185, bar*3+beat*3],
+    ];
+    for (const [n, t] of bass) this.schedBass(n, now+t, beat*0.8, 'square', 0.1);
+
+    // Quirky melody (square wave for chiptune merchant feel)
+    const mel: [number, number, number][] = [
+      [660, 0, beat*0.5], [698, beat*0.5, beat*0.5], [784, beat, beat],
+      [698, beat*2, beat*0.5], [660, beat*2.5, beat*0.5], [588, beat*3, beat],
+      [466, bar, beat], [524, bar+beat, beat*0.5], [588, bar+beat*1.5, beat*0.5],
+      [524, bar+beat*2, beat*2],
+      [440, bar*2, beat*0.5], [524, bar*2+beat*0.5, beat*0.5], [588, bar*2+beat, beat],
+      [660, bar*2+beat*2, beat*0.5], [588, bar*2+beat*2.5, beat*0.5], [524, bar*2+beat*3, beat],
+      [588, bar*3, beat*1.5], [660, bar*3+beat*1.5, beat*0.5],
+      [698, bar*3+beat*2, beat], [784, bar*3+beat*3, beat],
+    ];
+    for (const [n, t, d] of mel) this.schedNote(n, now+t, d, 'square', 0.08);
+
+    // Light percussion (every beat, softer)
+    for (let i = 0; i < 16; i++) {
+      this.schedHiHat(now + i * beat, i%4===0);
+    }
+
+    // Coin jingle accent on downbeats
+    for (let i = 0; i < 4; i++) {
+      this.schedNote(1320, now + i * bar, beat*0.15, 'sine', 0.05);
+      this.schedNote(1760, now + i * bar + beat*0.1, beat*0.15, 'sine', 0.04);
+    }
+
+    return loopDur;
+  }
+
+  // === Boss BGM (Intense, Dm-Bb-C-A, 150bpm, heavy bass + driving beat) ===
+  private playBossBgm(now: number): number {
+    const bpm = 150;
+    const beat = 60 / bpm;
+    const bar = beat * 4;
+    const loopDur = bar * 4;
+
+    // Heavy bass (octave jumps)
+    const bass: [number, number][] = [
+      [147, 0], [73, beat], [147, beat*2], [147, beat*2.5],
+      [117, bar], [58, bar+beat], [117, bar+beat*2], [117, bar+beat*2.5],
+      [131, bar*2], [65, bar*2+beat], [131, bar*2+beat*2], [147, bar*2+beat*3],
+      [110, bar*3], [55, bar*3+beat], [110, bar*3+beat*2], [131, bar*3+beat*3],
+    ];
+    for (const [n, t] of bass) this.schedBass(n, now+t, beat*0.8, 'sawtooth', 0.14);
+
+    // Aggressive melody (minor key, fast runs)
+    const mel: [number, number, number][] = [
+      [588, 0, beat*0.5], [660, beat*0.5, beat*0.5], [698, beat, beat*0.5],
+      [784, beat*1.5, beat*0.5], [880, beat*2, beat], [784, beat*3, beat],
+      [698, bar, beat], [660, bar+beat, beat*0.5], [588, bar+beat*1.5, beat*0.5],
+      [524, bar+beat*2, beat*2],
+      [660, bar*2, beat*0.5], [698, bar*2+beat*0.5, beat*0.5],
+      [784, bar*2+beat, beat], [880, bar*2+beat*2, beat*0.5],
+      [988, bar*2+beat*2.5, beat*0.5], [1047, bar*2+beat*3, beat],
+      [880, bar*3, beat*0.5], [784, bar*3+beat*0.5, beat*0.5],
+      [698, bar*3+beat, beat*0.5], [660, bar*3+beat*1.5, beat*0.5],
+      [588, bar*3+beat*2, beat*2],
+    ];
+    for (const [n, t, d] of mel) this.schedNote(n, now+t, d, 'square', 0.12);
+
+    // Driving drums: kick on 1&3, hi-hat on 8ths
+    for (let i = 0; i < 16; i++) {
+      if (i%4 === 0 || i%4 === 2) this.schedKick(now + i * beat);
+      this.schedHiHat(now + i * beat, true);
+      this.schedHiHat(now + i * beat + beat/2, false);
+    }
+
+    return loopDur;
+  }
+
+  // === Mid-Boss BGM (Heavier variant, Dm-Gm-A-Dm, 155bpm, with power chords) ===
+  private playMidBossBgm(now: number): number {
+    const bpm = 155;
+    const beat = 60 / bpm;
+    const bar = beat * 4;
+    const loopDur = bar * 4;
+
+    // Pounding bass with chromatic movement
+    const bass: [number, number][] = [
+      [147, 0], [147, beat*0.5], [139, beat], [147, beat*1.5],
+      [147, beat*2], [156, beat*3], [147, beat*3.5],
+      [196, bar], [196, bar+beat*0.5], [185, bar+beat], [196, bar+beat*1.5],
+      [196, bar+beat*2], [208, bar+beat*3],
+      [220, bar*2], [220, bar*2+beat], [208, bar*2+beat*2], [196, bar*2+beat*3],
+      [147, bar*3], [147, bar*3+beat], [175, bar*3+beat*2], [165, bar*3+beat*3],
+    ];
+    for (const [n, t] of bass) this.schedBass(n, now+t, beat*0.45, 'sawtooth', 0.16);
+
+    // Power chord stabs (fifths)
+    const chordTimes = [0, beat*2, bar, bar+beat*2, bar*2, bar*2+beat*2, bar*3, bar*3+beat*2];
+    const chordRoots = [294, 294, 392, 392, 440, 440, 294, 349];
+    for (let i = 0; i < chordTimes.length; i++) {
+      const t = now + chordTimes[i];
+      const root = chordRoots[i];
+      this.schedNote(root, t, beat*0.3, 'sawtooth', 0.08);
+      this.schedNote(root * 1.5, t, beat*0.3, 'sawtooth', 0.06);
+    }
+
+    // Intense melody
+    const mel: [number, number, number][] = [
+      [1175, 0, beat*0.5], [1047, beat*0.5, beat*0.5], [880, beat, beat],
+      [1047, beat*2, beat*0.5], [1175, beat*2.5, beat*0.5], [1320, beat*3, beat],
+      [1175, bar, beat*0.5], [1047, bar+beat*0.5, beat*0.5],
+      [988, bar+beat, beat], [880, bar+beat*2, beat*2],
+      [1047, bar*2, beat*0.5], [1175, bar*2+beat*0.5, beat*0.5],
+      [1320, bar*2+beat, beat*0.5], [1397, bar*2+beat*1.5, beat*0.5],
+      [1568, bar*2+beat*2, beat*2],
+      [1320, bar*3, beat], [1175, bar*3+beat, beat*0.5],
+      [1047, bar*3+beat*1.5, beat*0.5], [880, bar*3+beat*2, beat*2],
+    ];
+    for (const [n, t, d] of mel) this.schedNote(n, now+t, d, 'triangle', 0.13);
+
+    // Aggressive drums
+    for (let i = 0; i < 16; i++) {
+      this.schedKick(now + i * beat, i%2===0 ? 0.25 : 0.12);
+      this.schedHiHat(now + i * beat, true);
+      this.schedHiHat(now + i * beat + beat/2, true);
+    }
+
+    return loopDur;
+  }
+
+  // === Final Boss BGM (Epic, 160bpm, Dm-Cm-Bb-A, tremolo + descending chromatic) ===
+  private playFinalBossBgm(now: number): number {
+    const bpm = 160;
+    const beat = 60 / bpm;
+    const bar = beat * 4;
+    const loopDur = bar * 8; // Longer loop for final boss
+
+    // Relentless bass (16th note pulse)
+    const bassRoots = [147, 147, 131, 131, 117, 117, 110, 110];
+    for (let b = 0; b < 8; b++) {
+      const root = bassRoots[b];
+      for (let i = 0; i < 8; i++) {
+        const freq = i % 2 === 0 ? root : root * 1.5;
+        this.schedBass(freq, now + b*bar + i*beat*0.5, beat*0.45, 'sawtooth', 0.14);
+      }
+    }
+
+    // Epic melody with tremolo feel (two phrases)
+    const melA: [number, number, number][] = [
+      // Phrase A (bars 0-3): ascending fury
+      [588, 0, beat], [660, beat, beat*0.5], [698, beat*1.5, beat*0.5],
+      [784, beat*2, beat*1.5], [880, beat*3.5, beat*0.5],
+      [988, bar, beat], [880, bar+beat, beat*0.5], [784, bar+beat*1.5, beat*0.5],
+      [880, bar+beat*2, beat*2],
+      [1047, bar*2, beat*0.5], [988, bar*2+beat*0.5, beat*0.5],
+      [880, bar*2+beat, beat*0.5], [988, bar*2+beat*1.5, beat*0.5],
+      [1047, bar*2+beat*2, beat], [1175, bar*2+beat*3, beat],
+      [1320, bar*3, beat*2], [1175, bar*3+beat*2, beat],
+      [1047, bar*3+beat*3, beat],
+    ];
+    for (const [n, t, d] of melA) this.schedNote(n, now+t, d, 'square', 0.11);
+
+    // Phrase B (bars 4-7): descending chromatic tension
+    const melB: [number, number, number][] = [
+      [1320, bar*4, beat], [1245, bar*4+beat, beat], [1175, bar*4+beat*2, beat],
+      [1109, bar*4+beat*3, beat],
+      [1047, bar*5, beat*2], [988, bar*5+beat*2, beat], [880, bar*5+beat*3, beat],
+      [784, bar*6, beat*0.5], [880, bar*6+beat*0.5, beat*0.5],
+      [988, bar*6+beat, beat], [1047, bar*6+beat*2, beat],
+      [1175, bar*6+beat*3, beat],
+      [1320, bar*7, beat*1.5], [1175, bar*7+beat*1.5, beat*0.5],
+      [1047, bar*7+beat*2, beat], [1175, bar*7+beat*3, beat],
+    ];
+    for (const [n, t, d] of melB) this.schedNote(n, now+t, d, 'triangle', 0.12);
+
+    // Counter-melody (organ-like sustained chords)
+    const chordProg: [number[], number][] = [
+      [[294, 349, 440], 0], [[294, 349, 440], bar],
+      [[262, 311, 392], bar*2], [[262, 311, 392], bar*3],
+      [[233, 294, 349], bar*4], [[233, 294, 349], bar*5],
+      [[220, 277, 330], bar*6], [[220, 277, 330], bar*7],
+    ];
+    for (const [freqs, t] of chordProg) {
+      for (const f of freqs) {
+        this.schedNote(f, now+t, bar*0.9, 'sine', 0.05);
+      }
+    }
+
+    // Maximum intensity drums
+    for (let i = 0; i < 32; i++) {
+      const t = now + i * beat;
+      this.schedKick(t, 0.22);
+      this.schedHiHat(t, true);
+      this.schedHiHat(t + beat*0.25, false);
+      this.schedHiHat(t + beat*0.5, true);
+      this.schedHiHat(t + beat*0.75, false);
+    }
+
+    return loopDur;
+  }
+
+  // === Ending BGM (Triumphant and emotional, C-G-Am-F, 80bpm, slow and grand) ===
+  private playEndingBgm(now: number): number {
+    const bpm = 80;
+    const beat = 60 / bpm;
+    const bar = beat * 4;
+    const loopDur = bar * 8;
+
+    // Warm sustained bass
+    const bassRoots: [number, number][] = [
+      [131, 0], [131, bar], [196, bar*2], [196, bar*3],
+      [110, bar*4], [110, bar*5], [175, bar*6], [175, bar*7],
+    ];
+    for (const [n, t] of bassRoots) {
+      this.schedBass(n, now+t, bar*0.9, 'triangle', 0.1);
+    }
+
+    // Sustained chords (strings-like)
+    const chords: [number[], number][] = [
+      [[262, 330, 392], 0], [[262, 330, 392], bar],       // C
+      [[196, 247, 294], bar*2], [[196, 247, 294], bar*3], // G
+      [[220, 262, 330], bar*4], [[220, 262, 330], bar*5], // Am
+      [[175, 220, 262], bar*6], [[175, 220, 262], bar*7], // F
+    ];
+    for (const [freqs, t] of chords) {
+      for (const f of freqs) {
+        this.schedNote(f, now+t, bar*0.95, 'sine', 0.06);
+      }
+    }
+
+    // Soaring melody (emotional, resolving)
+    const mel: [number, number, number][] = [
+      // Phrase 1
+      [524, 0, beat*2], [660, beat*2, beat], [784, beat*3, beat],
+      [880, bar, beat*2], [784, bar+beat*2, beat], [660, bar+beat*3, beat],
+      [784, bar*2, beat*2], [880, bar*2+beat*2, beat], [784, bar*2+beat*3, beat],
+      [660, bar*3, beat*3], [784, bar*3+beat*3, beat],
+      // Phrase 2 (higher, more triumphant)
+      [880, bar*4, beat*2], [1047, bar*4+beat*2, beat], [880, bar*4+beat*3, beat],
+      [784, bar*5, beat*2], [660, bar*5+beat*2, beat*2],
+      [784, bar*6, beat], [880, bar*6+beat, beat], [1047, bar*6+beat*2, beat*2],
+      [1047, bar*7, beat*2], [880, bar*7+beat*2, beat], [784, bar*7+beat*3, beat],
+    ];
+    for (const [n, t, d] of mel) this.schedNote(n, now+t, d, 'triangle', 0.14);
+
+    // Gentle arpeggios
+    const arpTimes = [0, bar*2, bar*4, bar*6];
+    for (const at of arpTimes) {
+      for (let i = 0; i < 4; i++) {
+        this.schedNote(1568 + i * 200, now + at + bar + i * beat * 0.4, beat * 0.5, 'sine', 0.03);
+      }
+    }
+
+    return loopDur;
   }
 
   destroy(): void {
