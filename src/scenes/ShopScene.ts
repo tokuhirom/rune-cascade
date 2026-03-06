@@ -49,9 +49,15 @@ export class ShopScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
 
-    // Gem display
-    const gemsText = this.add.text(width / 2, 168, `Gems: ${player.gems}`, {
-      fontSize: '18px',
+    // Player status
+    const hpText = this.add.text(width / 2, 162, `HP: ${player.hp} / ${player.maxHp}`, {
+      fontSize: '14px',
+      color: player.hp < player.maxHp * 0.5 ? '#e74c3c' : '#2ecc71',
+      fontStyle: 'bold',
+    }).setOrigin(0.5);
+
+    const gemsText = this.add.text(width / 2, 180, `Gems: ${player.gems}`, {
+      fontSize: '16px',
       color: '#f1c40f',
       fontStyle: 'bold',
     }).setOrigin(0.5);
@@ -133,12 +139,14 @@ export class ShopScene extends Phaser.Scene {
     const picked = shuffled.slice(0, 3);
     const items = [...fixedItems, ...picked];
 
-    const startY = 190;
+    const startY = 200;
     const itemHeight = 52;
     const itemElements: { bg: Phaser.GameObjects.Graphics; hitArea?: Phaser.GameObjects.Rectangle; labelText: Phaser.GameObjects.Text; costText: Phaser.GameObjects.Text; item: ShopItem }[] = [];
 
     const refreshShop = () => {
       gemsText.setText(`Gems: ${player.gems}`);
+      hpText.setText(`HP: ${player.hp} / ${player.maxHp}`);
+      hpText.setColor(player.hp < player.maxHp * 0.5 ? '#e74c3c' : '#2ecc71');
       for (const el of itemElements) {
         const canAfford = player.gems >= el.item.cost && el.item.available(player);
         el.bg.clear();
