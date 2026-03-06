@@ -262,16 +262,18 @@ export class Board {
     for (let c = 0; c < BOARD_COLS; c++) {
       let writePos = BOARD_ROWS - 1;
       for (let r = BOARD_ROWS - 1; r >= 0; r--) {
-        if (this.grid[r][c] !== null) {
+        // Keep cells that have runes OR are obstacle blocks
+        if (this.grid[r][c] !== null || this.cellState[r][c] === CellState.Obstacle) {
+          const cellType = this.grid[r][c] ?? RuneType.Sword; // Obstacles use dummy type
           if (r !== writePos) {
-            drops.push({ col: c, fromRow: r, toRow: writePos, type: this.grid[r][c]!, state: this.cellState[r][c] });
+            drops.push({ col: c, fromRow: r, toRow: writePos, type: cellType, state: this.cellState[r][c] });
             this.grid[writePos][c] = this.grid[r][c];
             this.cellState[writePos][c] = this.cellState[r][c];
             this.grid[r][c] = null;
             this.cellState[r][c] = CellState.Normal;
           } else {
             // Stationary rune: still include in drops so sprites are rebuilt
-            drops.push({ col: c, fromRow: r, toRow: r, type: this.grid[r][c]!, state: this.cellState[r][c] });
+            drops.push({ col: c, fromRow: r, toRow: r, type: cellType, state: this.cellState[r][c] });
           }
           writePos--;
         }
