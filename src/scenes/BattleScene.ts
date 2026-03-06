@@ -556,7 +556,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private applyMatchEffects(matches: MatchResult[]): void {
-    const comboMult = 1 + (this.comboCount - 1) * 0.25;
+    // Combo multiplier scales exponentially for satisfying cascades
+    // Combo 1: 1.0x, 2: 1.3x, 3: 1.7x, 4: 2.2x, 5: 2.8x, 8: 5.5x
+    const comboMult = 1 + (this.comboCount - 1) * 0.3 + Math.max(0, this.comboCount - 3) * 0.2;
     const berserkMult = this.modifier === StageModifier.Berserk ? 1.5 : 1;
     const desperateMult = this.modifier === StageModifier.Desperate ? 1.5 : 1;
     const effectiveAtk = this.getEffectiveAttack();
@@ -878,8 +880,34 @@ export class BattleScene extends Phaser.Scene {
   private showCombo(count: number): void {
     const { width } = this.scale;
     this.fx.comboSplash(width / 2, 254, count);
-    if (count >= 3) {
-      this.fx.screenShake(count * 2, 200);
+
+    // Escalating screen shake and visual feedback
+    if (count >= 2) {
+      this.fx.screenShake(Math.min(count * 3, 20), 200 + count * 50);
+    }
+
+    // Big combo callout for 4+
+    if (count >= 4) {
+      const labels = ['', '', '', '', 'GREAT!', 'EXCELLENT!', 'AMAZING!', 'INCREDIBLE!'];
+      const label = count >= labels.length ? 'UNSTOPPABLE!' : labels[count];
+      const colors = ['', '', '', '', '#ffaa00', '#ff6600', '#ff2200', '#ff00ff'];
+      const color = count >= colors.length ? '#ff00ff' : colors[count];
+      const fontSize = Math.min(18 + count * 4, 40);
+
+      const txt = this.add.text(width / 2, 240, label, {
+        fontSize: `${fontSize}px`,
+        color,
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 4,
+      }).setOrigin(0.5).setDepth(300);
+
+      this.tweens.add({
+        targets: txt,
+        scaleX: 1.3, scaleY: 1.3, y: 220, alpha: 0,
+        duration: 1000, delay: 200,
+        onComplete: () => txt.destroy(),
+      });
     }
   }
 
