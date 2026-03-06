@@ -289,14 +289,14 @@ export class ShopScene extends Phaser.Scene {
 
     const startY = 200;
     const itemHeight = 52;
-    const itemElements: { bg: Phaser.GameObjects.Graphics; labelText: Phaser.GameObjects.Text; costText: Phaser.GameObjects.Text; item: ShopItem }[] = [];
+    const itemElements: { bg: Phaser.GameObjects.Graphics; labelText: Phaser.GameObjects.Text; descText: Phaser.GameObjects.Text; costText: Phaser.GameObjects.Text; item: ShopItem; sold: boolean }[] = [];
 
     const refreshShop = () => {
       gemsText.setText(`Gems: ${player.gems}`);
       hpText.setText(`HP: ${player.hp} / ${player.maxHp}`);
       hpText.setColor(player.hp < player.maxHp * 0.5 ? '#e74c3c' : '#2ecc71');
       for (const el of itemElements) {
-        const canAfford = player.gems >= el.item.cost && el.item.available(player);
+        const canAfford = !el.sold && player.gems >= el.item.cost && el.item.available(player);
         el.bg.clear();
         el.bg.fillStyle(canAfford ? 0x2c3e50 : 0x1a1a2e, 1);
         const y = startY + itemElements.indexOf(el) * itemHeight;
@@ -304,8 +304,14 @@ export class ShopScene extends Phaser.Scene {
         el.bg.fillRoundedRect(20, y, width - 40, itemHeight - 6, 6);
         el.bg.lineStyle(2, canAfford ? rarityInfo.border : 0x444444, 1);
         el.bg.strokeRoundedRect(20, y, width - 40, itemHeight - 6, 6);
-        el.labelText.setColor(canAfford ? rarityInfo.label : '#666666');
-        el.costText.setColor(canAfford ? '#f1c40f' : '#666666');
+        if (el.sold) {
+          el.labelText.setColor('#555555');
+          el.descText.setText('SOLD').setColor('#555555');
+          el.costText.setText('---').setColor('#555555');
+        } else {
+          el.labelText.setColor(canAfford ? rarityInfo.label : '#666666');
+          el.costText.setColor(canAfford ? '#f1c40f' : '#666666');
+        }
       }
     };
 
@@ -326,7 +332,7 @@ export class ShopScene extends Phaser.Scene {
         fontStyle: 'bold',
       });
 
-      this.add.text(35, y + 28, item.desc, {
+      const descText = this.add.text(35, y + 28, item.desc, {
         fontSize: '11px',
         color: canAfford ? '#bdc3c7' : '#555555',
       });
@@ -337,7 +343,7 @@ export class ShopScene extends Phaser.Scene {
         fontStyle: 'bold',
       }).setOrigin(1, 0.5);
 
-      const el = { bg, labelText, costText, item };
+      const el = { bg, labelText, descText, costText, item, sold: false };
       itemElements.push(el);
 
       const hitArea = this.add.rectangle(width / 2, y + (itemHeight - 6) / 2, width - 40, itemHeight - 6)
@@ -346,9 +352,10 @@ export class ShopScene extends Phaser.Scene {
         .setDepth(100);
 
       hitArea.on('pointerdown', () => {
-        if (player.gems >= item.cost && item.available(player)) {
+        if (!el.sold && player.gems >= item.cost && item.available(player)) {
           player.gems -= item.cost;
           item.apply(player);
+          el.sold = true;
           refreshShop();
         }
       });
