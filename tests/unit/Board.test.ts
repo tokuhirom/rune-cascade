@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Board } from '../../src/core/Board';
-import { BOARD_COLS, BOARD_ROWS, RuneType } from '../../src/core/constants';
+import { BOARD_COLS, BOARD_ROWS, RuneType, CellState } from '../../src/core/constants';
 
 function createBoardWithGrid(grid: (RuneType | null)[][]): Board {
   const board = new Board();
   board.grid = grid.map(row => [...row]);
+  // Reset cell states
+  board.cellState = grid.map(row => row.map(() => CellState.Normal));
   return board;
 }
 
@@ -300,6 +302,143 @@ describe('Board', () => {
       expect(board.grid[5][2]).toBe(originalOrder[2]);
       expect(board.grid[4][2]).toBe(originalOrder[1]);
       expect(board.grid[3][2]).toBe(originalOrder[0]);
+    });
+  });
+
+  describe('special cell states', () => {
+    it('frozen cells are not matchable', () => {
+      const grid = makeGrid();
+      grid[0][0] = RuneType.Gold;
+      grid[0][1] = RuneType.Gold;
+      grid[0][2] = RuneType.Gold;
+      const board = createBoardWithGrid(grid);
+      board.cellState[0][1] = CellState.Frozen;
+      const matches = board.findMatches();
+      // Should not find a match because middle cell is frozen
+      const goldMatches = matches.filter(m => m.type === RuneType.Gold && m.positions.some(([r]) => r === 0));
+      expect(goldMatches.length).toBe(0);
+    });
+
+    it('obstacle cells are not matchable', () => {
+      const grid = makeGrid();
+      grid[0][0] = RuneType.Gold;
+      grid[0][1] = RuneType.Gold;
+      grid[0][2] = RuneType.Gold;
+      const board = createBoardWithGrid(grid);
+      board.cellState[0][0] = CellState.Obstacle;
+      board.grid[0][0] = null;
+      const matches = board.findMatches();
+      const goldMatches = matches.filter(m => m.type === RuneType.Gold && m.positions.some(([r]) => r === 0));
+      expect(goldMatches.length).toBe(0);
+    });
+
+    it('rowClear cells can be matched', () => {
+      const grid = makeGrid();
+      grid[0][0] = RuneType.Gold;
+      grid[0][1] = RuneType.Gold;
+      grid[0][2] = RuneType.Gold;
+      const board = createBoardWithGrid(grid);
+      board.cellState[0][1] = CellState.RowClear;
+      const matches = board.findMatches();
+      expect(matches.length).toBeGreaterThan(0);
+    });
+
+    it('canSwap returns false for frozen cells', () => {
+      const board = new Board();
+      board.cellState[0][0] = CellState.Frozen;
+      expect(board.canSwap(0, 0)).toBe(false);
+    });
+
+    it('canSwap returns false for obstacle cells', () => {
+      const board = new Board();
+      board.cellState[0][0] = CellState.Obstacle;
+      expect(board.canSwap(0, 0)).toBe(false);
+    });
+
+    it('getAdjacentSpecials thaws frozen cells adjacent to matches', () => {
+      const grid = makeGrid();
+      grid[0][0] = RuneType.Gold;
+      grid[0][1] = RuneType.Gold;
+      grid[0][2] = RuneType.Gold;
+      const board = createBoardWithGrid(grid);
+      board.cellState[1][1] = CellState.Frozen;
+      const matches = board.findMatches();
+      const { thawed } = board.getAdjacentSpecials(matches);
+      expect(thawed.length).toBe(1);
+      expect(thawed[0]).toEqual([1, 1]);
+      expect(board.cellState[1][1]).toBe(CellState.Normal);
+    });
+
+    it('getAdjacentSpecials destroys obstacles adjacent to matches', () => {
+      const grid = makeGrid();
+      grid[0][0] = RuneType.Gold;
+      grid[0][1] = RuneType.Gold;
+      grid[0][2] = RuneType.Gold;
+      const board = createBoardWithGrid(grid);
+      board.cellState[1][0] = CellState.Obstacle;
+      board.grid[1][0] = null;
+      const matches = board.findMatches();
+      const { destroyedObstacles } = board.getAdjacentSpecials(matches);
+      expect(destroyedObstacles.length).toBe(1);
+      expect(board.cellState[1][0]).toBe(CellState.Normal);
+    });
+
+    it('freezeRunes places frozen state on normal cells', () => {
+      const board = new Board();
+      const frozen = board.freezeRunes(3);
+      expect(frozen.length).toBe(3);
+      for (const [r, c] of frozen) {
+        expect(board.cellState[r][c]).toBe(CellState.Frozen);
+      }
+    });
+
+    it('placeObstacles replaces runes with obstacles', () => {
+      const board = new Board();
+      const placed = board.placeObstacles(2);
+      expect(placed.length).toBe(2);
+      for (const [r, c] of placed) {
+        expect(board.cellState[r][c]).toBe(CellState.Obstacle);
+        expect(board.grid[r][c]).toBeNull();
+      }
+    });
+
+    it('placeRowClear marks one cell as RowClear', () => {
+      const board = new Board();
+      const pos = board.placeRowClear();
+      expect(pos).not.toBeNull();
+      if (pos) {
+        expect(board.cellState[pos[0]][pos[1]]).toBe(CellState.RowClear);
+      }
+    });
+
+    it('getRowClearRows returns rows with RowClear cells in matches', () => {
+      const grid = makeGrid();
+      grid[3][0] = RuneType.Gold;
+      grid[3][1] = RuneType.Gold;
+      grid[3][2] = RuneType.Gold;
+      const board = createBoardWithGrid(grid);
+      board.cellState[3][1] = CellState.RowClear;
+      const matches = board.findMatches();
+      const rows = board.getRowClearRows(matches);
+      expect(rows).toContain(3);
+    });
+
+    it('clearRows clears all cells in specified rows', () => {
+      const board = new Board();
+      const cleared = board.clearRows([2]);
+      expect(cleared.length).toBe(BOARD_COLS);
+      for (let c = 0; c < BOARD_COLS; c++) {
+        expect(board.grid[2][c]).toBeNull();
+      }
+    });
+
+    it('swap also swaps cell states', () => {
+      const board = new Board();
+      board.cellState[0][0] = CellState.RowClear;
+      board.cellState[0][1] = CellState.Normal;
+      board.swap(0, 0, 0, 1);
+      expect(board.cellState[0][0]).toBe(CellState.Normal);
+      expect(board.cellState[0][1]).toBe(CellState.RowClear);
     });
   });
 

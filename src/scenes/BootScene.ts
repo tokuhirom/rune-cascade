@@ -129,6 +129,22 @@ export class BootScene extends Phaser.Scene {
       g.destroy();
     }
 
+    // Generate obstacle texture
+    {
+      const size = CELL_SIZE - 4;
+      const g = this.add.graphics();
+      g.fillStyle(0x555555, 1);
+      g.fillRoundedRect(0, 0, size, size, 8);
+      g.lineStyle(2, 0x333333, 1);
+      g.strokeRoundedRect(0, 0, size, size, 8);
+      // X pattern
+      g.lineStyle(3, 0x888888, 0.6);
+      g.lineBetween(10, 10, size - 10, size - 10);
+      g.lineBetween(size - 10, 10, 10, size - 10);
+      g.generateTexture('rune_obstacle', size, size);
+      g.destroy();
+    }
+
     // Generate unique enemy textures
     for (const [name, design] of Object.entries(ENEMY_DESIGNS)) {
       this.generateEnemyTexture(name, design);

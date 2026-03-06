@@ -30,6 +30,14 @@ export const RUNE_SYMBOLS: Record<RuneType, string> = {
 
 export const RUNE_COUNT = 5;
 
+// Special cell states overlaid on the board
+export enum CellState {
+  Normal = 0,
+  Frozen = 1,      // Cannot be matched; thaws when adjacent rune is matched
+  Obstacle = 2,    // Unmatchable block; destroyed when adjacent rune is matched
+  RowClear = 3,    // Clears entire row when matched
+}
+
 export const MAX_FLOOR = 100;
 export const WARP_FLOORS = [20, 40, 60, 80];
 
@@ -76,6 +84,8 @@ export enum EnemyAbility {
   Scramble = 'scramble',     // Shuffles board runes on attack
   MultiHit = 'multihit',     // Attacks multiple times (weaker each)
   Drain = 'drain',           // Steals HP on attack
+  Freeze = 'freeze',         // Freezes random runes on attack
+  Obstacle = 'obstacle',     // Places obstacle blocks on attack
 }
 
 export interface EnemyData {
@@ -103,8 +113,8 @@ export function isMidBossFloor(stage: number): boolean {
 function getMidBossSecondaryAbilities(name: string): EnemyAbility[] {
   switch (name) {
     case 'Hydra': return [EnemyAbility.Revive];
-    case 'Shadow King': return [EnemyAbility.Scramble];
-    case 'Crystal Titan': return [EnemyAbility.Enrage];
+    case 'Shadow King': return [EnemyAbility.Freeze];
+    case 'Crystal Titan': return [EnemyAbility.Obstacle];
     case 'Void Wyrm': return [EnemyAbility.MultiHit];
     case 'Chaos Emperor': return [EnemyAbility.Enrage, EnemyAbility.Poison];
     default: return [];
@@ -152,8 +162,8 @@ const ENEMY_TEMPLATES: EnemyTemplate[] = [
   { name: 'Goblin', hpMult: 1.0, atkMult: 1.0, timer: 3, ability: EnemyAbility.None, abilityDesc: '' },
   { name: 'Skeleton', hpMult: 0.8, atkMult: 0.9, timer: 2, ability: EnemyAbility.Revive, abilityDesc: 'Revives once at 50% HP' },
   { name: 'Orc', hpMult: 1.4, atkMult: 1.2, timer: 4, ability: EnemyAbility.Enrage, abilityDesc: 'Enrages below 30% HP (ATK x2)' },
-  { name: 'Dark Mage', hpMult: 0.9, atkMult: 1.0, timer: 3, ability: EnemyAbility.Scramble, abilityDesc: 'Shuffles board on attack' },
-  { name: 'Golem', hpMult: 2.0, atkMult: 0.8, timer: 5, ability: EnemyAbility.Armor, abilityDesc: 'Takes 50% damage' },
+  { name: 'Dark Mage', hpMult: 0.9, atkMult: 1.0, timer: 3, ability: EnemyAbility.Freeze, abilityDesc: 'Freezes 2 runes on attack' },
+  { name: 'Golem', hpMult: 2.0, atkMult: 0.8, timer: 5, ability: EnemyAbility.Obstacle, abilityDesc: 'Places 2 obstacles on attack' },
   { name: 'Dragon', hpMult: 1.5, atkMult: 1.5, timer: 4, ability: EnemyAbility.MultiHit, abilityDesc: 'Attacks 3 times' },
   { name: 'Lich', hpMult: 1.2, atkMult: 1.1, timer: 3, ability: EnemyAbility.Drain, abilityDesc: 'Drains HP on attack' },
   { name: 'Demon Lord', hpMult: 2.0, atkMult: 1.8, timer: 4, ability: EnemyAbility.Poison, abilityDesc: 'Poisons you (5 dmg/turn)' },

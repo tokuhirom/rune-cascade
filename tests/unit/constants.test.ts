@@ -51,16 +51,16 @@ describe('generateEnemy', () => {
     expect(e.enraged).toBe(false);
   });
 
-  it('Dark Mage has Scramble ability', () => {
+  it('Dark Mage has Freeze ability', () => {
     const e = generateEnemy(4);
     expect(e.name).toBe('Dark Mage');
-    expect(e.ability).toBe(EnemyAbility.Scramble);
+    expect(e.ability).toBe(EnemyAbility.Freeze);
   });
 
-  it('Golem has Armor ability and high HP', () => {
+  it('Golem has Obstacle ability and high HP', () => {
     const e = generateEnemy(5);
     expect(e.name).toBe('Golem');
-    expect(e.ability).toBe(EnemyAbility.Armor);
+    expect(e.ability).toBe(EnemyAbility.Obstacle);
     // Golem has 2x HP multiplier
     const goblin = generateEnemy(1);
     expect(e.maxHp).toBeGreaterThan(goblin.maxHp * 1.5);

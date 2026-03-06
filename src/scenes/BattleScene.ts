@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { Board, MatchResult } from '../core/Board';
 import {
   BOARD_COLS, BOARD_ROWS, CELL_SIZE, BOARD_OFFSET_X, BOARD_OFFSET_Y,
-  RuneType, RUNE_SYMBOLS, RUNE_COLORS, MAX_FLOOR, WARP_FLOORS,
+  RuneType, RUNE_SYMBOLS, RUNE_COLORS, MAX_FLOOR, WARP_FLOORS, CellState,
   PlayerStats, EnemyData, EnemyAbility, generateEnemy, enemyHasAbility,
   StageModifier, STAGE_MODIFIERS, rollStageModifier, SaveData,
 } from '../core/constants';
@@ -225,12 +225,23 @@ export class BattleScene extends Phaser.Scene {
 
   private createRuneAt(r: number, c: number): Phaser.GameObjects.Container | null {
     const type = this.board.get(r, c);
+    const state = this.board.getState(r, c);
+
+    // Obstacle cells have no rune type but need a sprite
+    if (state === CellState.Obstacle) {
+      return this.createObstacleAt(r, c);
+    }
+
     if (type === null) return null;
 
     const x = BOARD_OFFSET_X + c * CELL_SIZE + CELL_SIZE / 2;
     const y = BOARD_OFFSET_Y + r * CELL_SIZE + CELL_SIZE / 2;
 
+    const children: Phaser.GameObjects.GameObject[] = [];
+
     const img = this.add.image(0, 0, `rune_${type}`);
+    children.push(img);
+
     const symbol = this.add.text(0, 0, RUNE_SYMBOLS[type], {
       fontSize: '24px',
       color: '#ffffff',
@@ -238,14 +249,65 @@ export class BattleScene extends Phaser.Scene {
       stroke: '#000000',
       strokeThickness: 2,
     }).setOrigin(0.5);
+    children.push(symbol);
 
-    const container = this.add.container(x, y, [img, symbol]);
+    // Frozen overlay
+    if (state === CellState.Frozen) {
+      const frost = this.add.graphics();
+      const s = CELL_SIZE - 4;
+      frost.fillStyle(0x88ccff, 0.4);
+      frost.fillRoundedRect(-s / 2, -s / 2, s, s, 8);
+      frost.lineStyle(2, 0xaaddff, 0.8);
+      frost.strokeRoundedRect(-s / 2, -s / 2, s, s, 8);
+      children.push(frost);
+      // Ice crystal symbol
+      const iceText = this.add.text(0, 0, '\u2744', {
+        fontSize: '16px',
+        color: '#ffffff',
+      }).setOrigin(0.5).setAlpha(0.7);
+      children.push(iceText);
+    }
+
+    // Row-clear overlay
+    if (state === CellState.RowClear) {
+      const arrow = this.add.graphics();
+      const s = CELL_SIZE - 4;
+      arrow.lineStyle(2, 0xffaa00, 0.9);
+      arrow.lineBetween(-s / 2 + 4, 0, s / 2 - 4, 0);
+      // Arrow heads
+      arrow.lineBetween(-s / 2 + 4, 0, -s / 2 + 10, -4);
+      arrow.lineBetween(-s / 2 + 4, 0, -s / 2 + 10, 4);
+      arrow.lineBetween(s / 2 - 4, 0, s / 2 - 10, -4);
+      arrow.lineBetween(s / 2 - 4, 0, s / 2 - 10, 4);
+      children.push(arrow);
+    }
+
+    const container = this.add.container(x, y, children);
     container.setSize(CELL_SIZE - 4, CELL_SIZE - 4);
     container.setInteractive();
     container.setData('row', r);
     container.setData('col', c);
 
     return container;
+  }
+
+  private createObstacleAt(r: number, c: number): Phaser.GameObjects.Container {
+    const x = BOARD_OFFSET_X + c * CELL_SIZE + CELL_SIZE / 2;
+    const y = BOARD_OFFSET_Y + r * CELL_SIZE + CELL_SIZE / 2;
+
+    const img = this.add.image(0, 0, 'rune_obstacle');
+    const container = this.add.container(x, y, [img]);
+    container.setSize(CELL_SIZE - 4, CELL_SIZE - 4);
+    container.setData('row', r);
+    container.setData('col', c);
+
+    return container;
+  }
+
+  private refreshRuneVisual(r: number, c: number): void {
+    const sprite = this.runeSprites[r]?.[c];
+    if (sprite) sprite.destroy();
+    this.runeSprites[r][c] = this.createRuneAt(r, c);
   }
 
   private createRuneLegend(width: number): void {
@@ -342,6 +404,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private async trySwap(r1: number, c1: number, r2: number, c2: number): Promise<void> {
+    // Prevent swapping frozen or obstacle cells
+    if (!this.board.canSwap(r1, c1) || !this.board.canSwap(r2, c2)) {
+      this.showStatusMessage('Blocked!', '#888888');
+      return;
+    }
+
     this.isProcessing = true;
     this.comboCount = 0;
     this.shieldBuffer = 0;
@@ -419,11 +487,44 @@ export class BattleScene extends Phaser.Scene {
 
       this.applyMatchEffects(matches);
 
+      // Check for row-clear runes in matches
+      const rowClearRows = this.board.getRowClearRows(matches);
+
+      // Handle adjacent frozen/obstacle cells
+      const { thawed, destroyedObstacles } = this.board.getAdjacentSpecials(matches);
+
       await this.animateRemove(matches);
       this.board.removeMatches(matches);
 
+      // Clear entire rows from row-clear runes
+      if (rowClearRows.length > 0) {
+        const rowCleared = this.board.clearRows(rowClearRows);
+        await this.animateRowClear(rowCleared);
+        this.showStatusMessage('ROW CLEAR!', '#ff8800');
+      }
+
+      // Animate thawed runes (update their visual)
+      if (thawed.length > 0) {
+        for (const [r, c] of thawed) {
+          this.refreshRuneVisual(r, c);
+        }
+      }
+
+      // Animate destroyed obstacles
+      if (destroyedObstacles.length > 0) {
+        await this.animateObstacleDestroy(destroyedObstacles);
+      }
+
       const drops = this.board.applyGravity();
       await this.animateDrops(drops);
+
+      // Small chance to spawn a row-clear rune (5%)
+      if (Math.random() < 0.05) {
+        const pos = this.board.placeRowClear();
+        if (pos) {
+          this.refreshRuneVisual(pos[0], pos[1]);
+        }
+      }
 
       this.updateUI();
 
@@ -660,6 +761,9 @@ export class BattleScene extends Phaser.Scene {
       await this.shuffleBoard();
     }
 
+    // Freeze / Obstacle
+    await this.placeSpecialBlocks();
+
     await this.delay(300);
   }
 
@@ -861,7 +965,7 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  private animateDrops(drops: { col: number; fromRow: number; toRow: number; type: RuneType }[]): Promise<void> {
+  private animateDrops(drops: { col: number; fromRow: number; toRow: number; type: RuneType; state?: CellState }[]): Promise<void> {
     return new Promise((resolve) => {
       for (let r = 0; r < BOARD_ROWS; r++) {
         for (let c = 0; c < BOARD_COLS; c++) {
@@ -874,23 +978,57 @@ export class BattleScene extends Phaser.Scene {
       let completed = 0;
 
       for (const drop of drops) {
-        const { col, fromRow, toRow, type } = drop;
+        const { col, fromRow, toRow, type, state } = drop;
         const targetX = BOARD_OFFSET_X + col * CELL_SIZE + CELL_SIZE / 2;
         const targetY = BOARD_OFFSET_Y + toRow * CELL_SIZE + CELL_SIZE / 2;
         const startY = BOARD_OFFSET_Y + fromRow * CELL_SIZE + CELL_SIZE / 2;
 
-        const img = this.add.image(0, 0, `rune_${type}`);
-        const symbol = this.add.text(0, 0, RUNE_SYMBOLS[type], {
-          fontSize: '24px',
-          color: '#ffffff',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 2,
-        }).setOrigin(0.5);
+        const cellState = state ?? CellState.Normal;
+        const children: Phaser.GameObjects.GameObject[] = [];
 
-        const container = this.add.container(targetX, startY, [img, symbol]);
+        if (cellState === CellState.Obstacle) {
+          children.push(this.add.image(0, 0, 'rune_obstacle'));
+        } else {
+          children.push(this.add.image(0, 0, `rune_${type}`));
+          children.push(this.add.text(0, 0, RUNE_SYMBOLS[type], {
+            fontSize: '24px',
+            color: '#ffffff',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2,
+          }).setOrigin(0.5));
+
+          if (cellState === CellState.Frozen) {
+            const s = CELL_SIZE - 4;
+            const frost = this.add.graphics();
+            frost.fillStyle(0x88ccff, 0.4);
+            frost.fillRoundedRect(-s / 2, -s / 2, s, s, 8);
+            frost.lineStyle(2, 0xaaddff, 0.8);
+            frost.strokeRoundedRect(-s / 2, -s / 2, s, s, 8);
+            children.push(frost);
+            children.push(this.add.text(0, 0, '\u2744', {
+              fontSize: '16px', color: '#ffffff',
+            }).setOrigin(0.5).setAlpha(0.7));
+          }
+
+          if (cellState === CellState.RowClear) {
+            const s = CELL_SIZE - 4;
+            const arrow = this.add.graphics();
+            arrow.lineStyle(2, 0xffaa00, 0.9);
+            arrow.lineBetween(-s / 2 + 4, 0, s / 2 - 4, 0);
+            arrow.lineBetween(-s / 2 + 4, 0, -s / 2 + 10, -4);
+            arrow.lineBetween(-s / 2 + 4, 0, -s / 2 + 10, 4);
+            arrow.lineBetween(s / 2 - 4, 0, s / 2 - 10, -4);
+            arrow.lineBetween(s / 2 - 4, 0, s / 2 - 10, 4);
+            children.push(arrow);
+          }
+        }
+
+        const container = this.add.container(targetX, startY, children);
         container.setSize(CELL_SIZE - 4, CELL_SIZE - 4);
-        container.setInteractive();
+        if (cellState !== CellState.Obstacle) {
+          container.setInteractive();
+        }
         container.setData('row', toRow);
         container.setData('col', col);
 
@@ -911,6 +1049,101 @@ export class BattleScene extends Phaser.Scene {
 
       if (animCount === 0) resolve();
     });
+  }
+
+  private animateRowClear(positions: [number, number][]): Promise<void> {
+    return new Promise((resolve) => {
+      let count = positions.length;
+      if (count === 0) { resolve(); return; }
+      for (const [r, c] of positions) {
+        const sprite = this.runeSprites[r]?.[c];
+        if (sprite) {
+          this.tweens.add({
+            targets: sprite,
+            scaleX: 2, scaleY: 0, alpha: 0,
+            duration: 250,
+            onComplete: () => {
+              sprite.destroy();
+              this.runeSprites[r][c] = null;
+              count--;
+              if (count <= 0) resolve();
+            },
+          });
+        } else {
+          count--;
+          if (count <= 0) resolve();
+        }
+      }
+    });
+  }
+
+  private animateObstacleDestroy(positions: [number, number][]): Promise<void> {
+    return new Promise((resolve) => {
+      let count = positions.length;
+      if (count === 0) { resolve(); return; }
+      for (const [r, c] of positions) {
+        const sprite = this.runeSprites[r]?.[c];
+        if (sprite) {
+          this.fx.runeMatchBurst(
+            BOARD_OFFSET_X + c * CELL_SIZE + CELL_SIZE / 2,
+            BOARD_OFFSET_Y + r * CELL_SIZE + CELL_SIZE / 2,
+            RuneType.Shield,
+          );
+          this.tweens.add({
+            targets: sprite,
+            scaleX: 0, scaleY: 0, alpha: 0,
+            duration: 200,
+            onComplete: () => {
+              sprite.destroy();
+              this.runeSprites[r][c] = null;
+              count--;
+              if (count <= 0) resolve();
+            },
+          });
+        } else {
+          count--;
+          if (count <= 0) resolve();
+        }
+      }
+    });
+  }
+
+  private async placeSpecialBlocks(): Promise<void> {
+    // Freeze ability
+    if (enemyHasAbility(this.enemy, EnemyAbility.Freeze)) {
+      const freezeCount = Math.min(2 + Math.floor(this.stage / 20), 4);
+      const frozen = this.board.freezeRunes(freezeCount);
+      for (const [r, c] of frozen) {
+        this.refreshRuneVisual(r, c);
+        const sprite = this.runeSprites[r]?.[c];
+        if (sprite) {
+          sprite.setScale(0);
+          this.tweens.add({ targets: sprite, scaleX: 1, scaleY: 1, duration: 200 });
+        }
+      }
+      if (frozen.length > 0) {
+        this.showStatusMessage(`Froze ${frozen.length} runes!`, '#88ccff');
+        await this.delay(300);
+      }
+    }
+
+    // Obstacle ability
+    if (enemyHasAbility(this.enemy, EnemyAbility.Obstacle)) {
+      const obstacleCount = Math.min(2 + Math.floor(this.stage / 25), 3);
+      const placed = this.board.placeObstacles(obstacleCount);
+      for (const [r, c] of placed) {
+        this.refreshRuneVisual(r, c);
+        const sprite = this.runeSprites[r]?.[c];
+        if (sprite) {
+          sprite.setScale(0);
+          this.tweens.add({ targets: sprite, scaleX: 1, scaleY: 1, duration: 200 });
+        }
+      }
+      if (placed.length > 0) {
+        this.showStatusMessage(`${placed.length} obstacles placed!`, '#888888');
+        await this.delay(300);
+      }
+    }
   }
 
   private delay(ms: number): Promise<void> {
