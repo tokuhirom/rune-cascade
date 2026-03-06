@@ -56,9 +56,10 @@ export class ShopScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    // Shop items
+    // Shop items: fixed (heal/return) + random selection from pool
     const returnCost = 30 + data.stage * 2;
-    const items: ShopItem[] = [
+
+    const fixedItems: ShopItem[] = [
       {
         label: 'Heal 50%',
         desc: 'Recover half of max HP',
@@ -73,6 +74,9 @@ export class ShopScene extends Phaser.Scene {
         available: (p) => p.hp < p.maxHp,
         apply: (p) => { p.hp = p.maxHp; },
       },
+    ];
+
+    const randomPool: ShopItem[] = [
       {
         label: 'ATK Boost',
         desc: 'ATK +50% this run',
@@ -101,7 +105,33 @@ export class ShopScene extends Phaser.Scene {
         available: () => true,
         apply: (p) => { p.items.shuffle++; },
       },
+      {
+        label: 'Max HP +5',
+        desc: 'Permanently increase max HP',
+        cost: 12,
+        available: () => true,
+        apply: (p) => { p.maxHp += 5; p.hp += 5; },
+      },
+      {
+        label: 'Sharpen',
+        desc: 'ATK +1 permanently',
+        cost: 15,
+        available: () => true,
+        apply: (p) => { p.attack += 1; },
+      },
+      {
+        label: 'Reinforce',
+        desc: 'DEF +1 permanently',
+        cost: 12,
+        available: () => true,
+        apply: (p) => { p.defense += 1; },
+      },
     ];
+
+    // Pick 3 random items from pool
+    const shuffled = randomPool.sort(() => Math.random() - 0.5);
+    const picked = shuffled.slice(0, 3);
+    const items = [...fixedItems, ...picked];
 
     const startY = 190;
     const itemHeight = 52;
