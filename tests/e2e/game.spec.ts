@@ -1,16 +1,41 @@
 import { test, expect } from '@playwright/test';
 
+// Helper: skip story (2 taps) and get to town, then click EXPLORE to start battle
+async function skipStoryAndStartBattle(page: import('@playwright/test').Page) {
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible({ timeout: 10000 });
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('No canvas bounding box');
+
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+
+  // Story page 1 - tap to continue
+  await page.waitForTimeout(1500);
+  await page.mouse.click(cx, cy);
+  await page.waitForTimeout(1000);
+
+  // Story page 2 - tap to begin
+  await page.mouse.click(cx, cy);
+  await page.waitForTimeout(1000);
+
+  // Now in Town - click EXPLORE DUNGEON button area
+  // The button is around y=215 in game coords (roughly 30% of height)
+  await page.mouse.click(cx, box.y + box.height * 0.33);
+  await page.waitForTimeout(2000);
+
+  return box;
+}
+
 test.describe('Rune Cascade', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear save data
     await page.goto('/');
     await page.evaluate(() => localStorage.clear());
     await page.reload();
   });
 
-  test('loads and shows title screen', async ({ page }) => {
+  test('loads and shows story screen', async ({ page }) => {
     await page.goto('/');
-    // Wait for Phaser canvas to appear
     const canvas = page.locator('canvas');
     await expect(canvas).toBeVisible({ timeout: 10000 });
   });
@@ -19,7 +44,6 @@ test.describe('Rune Cascade', () => {
     await page.goto('/');
     const canvas = page.locator('canvas');
     await expect(canvas).toBeVisible({ timeout: 10000 });
-    // Phaser canvas should exist
     const count = await canvas.count();
     expect(count).toBe(1);
   });
@@ -30,50 +54,38 @@ test.describe('Rune Cascade', () => {
     await page.goto('/');
     const canvas = page.locator('canvas');
     await expect(canvas).toBeVisible({ timeout: 10000 });
-    // Wait a bit for any deferred errors
     await page.waitForTimeout(2000);
     expect(errors).toEqual([]);
   });
 
-  test('can click on canvas without crash', async ({ page }) => {
+  test('story advances and reaches town', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
     await page.goto('/');
     const canvas = page.locator('canvas');
     await expect(canvas).toBeVisible({ timeout: 10000 });
 
-    // Click the START button area (center of canvas, around y=380 in game coordinates)
     const box = await canvas.boundingBox();
     if (box) {
-      // Click center-ish to hit START
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.53);
-      await page.waitForTimeout(2000);
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+
+      // Tap through story (2 pages)
+      await page.waitForTimeout(1500);
+      await page.mouse.click(cx, cy);
+      await page.waitForTimeout(1000);
+      await page.mouse.click(cx, cy);
+      await page.waitForTimeout(1000);
     }
     expect(errors).toEqual([]);
   });
 
-  test('game board appears after starting', async ({ page }) => {
+  test('can start battle from town', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
     await page.goto('/');
-    const canvas = page.locator('canvas');
-    await expect(canvas).toBeVisible({ timeout: 10000 });
 
-    const box = await canvas.boundingBox();
-    if (box) {
-      // Click START
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.53);
-      await page.waitForTimeout(2000);
-
-      // Try dragging on the board area (should not crash)
-      const boardY = box.y + box.height * 0.55;
-      const boardX = box.x + box.width * 0.3;
-      await page.mouse.move(boardX, boardY);
-      await page.mouse.down();
-      await page.mouse.move(boardX + 50, boardY, { steps: 5 });
-      await page.mouse.up();
-      await page.waitForTimeout(2000);
-    }
+    await skipStoryAndStartBattle(page);
     expect(errors).toEqual([]);
   });
 
@@ -81,26 +93,19 @@ test.describe('Rune Cascade', () => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
     await page.goto('/');
-    const canvas = page.locator('canvas');
-    await expect(canvas).toBeVisible({ timeout: 10000 });
 
-    const box = await canvas.boundingBox();
-    if (box) {
-      // Click START
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.53);
-      await page.waitForTimeout(2000);
+    const box = await skipStoryAndStartBattle(page);
 
-      // Multiple drag swipes in different directions
-      const boardX = box.x + box.width * 0.4;
-      const boardY = box.y + box.height * 0.6;
+    // Multiple drag swipes
+    const boardX = box.x + box.width * 0.4;
+    const boardY = box.y + box.height * 0.6;
 
-      for (const [dx, dy] of [[50, 0], [0, 50], [-50, 0], [0, -50]]) {
-        await page.mouse.move(boardX, boardY);
-        await page.mouse.down();
-        await page.mouse.move(boardX + dx, boardY + dy, { steps: 5 });
-        await page.mouse.up();
-        await page.waitForTimeout(1500);
-      }
+    for (const [dx, dy] of [[50, 0], [0, 50], [-50, 0], [0, -50]]) {
+      await page.mouse.move(boardX, boardY);
+      await page.mouse.down();
+      await page.mouse.move(boardX + dx, boardY + dy, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForTimeout(1500);
     }
     expect(errors).toEqual([]);
   });

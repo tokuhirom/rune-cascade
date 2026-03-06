@@ -18,8 +18,11 @@ export class StoryScene extends Phaser.Scene {
     super('Story');
   }
 
+  init(data: { page?: number }): void {
+    this.currentPage = data.page || 0;
+  }
+
   create(): void {
-    this.currentPage = 0;
     this.showPage();
   }
 
@@ -76,10 +79,10 @@ export class StoryScene extends Phaser.Scene {
           this.scene.start('Town');
         });
       } else {
-        this.currentPage++;
+        const nextPage = this.currentPage + 1;
         this.cameras.main.fadeOut(300);
         this.time.delayedCall(300, () => {
-          this.scene.restart();
+          this.scene.restart({ page: nextPage });
         });
       }
     });
