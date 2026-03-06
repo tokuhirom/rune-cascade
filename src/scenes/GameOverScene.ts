@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PlayerStats, SaveData } from '../core/constants';
 import { BattleScene } from './BattleScene';
+import { createMuteButton } from '../core/SoundManager';
 
 export class GameOverScene extends Phaser.Scene {
   constructor() {
@@ -9,6 +10,7 @@ export class GameOverScene extends Phaser.Scene {
 
   create(data: { player: PlayerStats; stage: number; won: boolean }): void {
     const { width } = this.scale;
+    createMuteButton(this);
     const { player, stage } = data;
 
     this.add.text(width / 2, 160, 'GAME OVER', {

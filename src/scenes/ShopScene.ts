@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PlayerStats, SaveData, WARP_FLOORS } from '../core/constants';
 import { BattleScene } from './BattleScene';
+import { createMuteButton } from '../core/SoundManager';
 
 type Rarity = 'common' | 'rare' | 'epic' | 'cursed';
 
@@ -34,6 +35,8 @@ export class ShopScene extends Phaser.Scene {
     if (WARP_FLOORS.includes(data.stage)) {
       this.unlockWarp(data.stage);
     }
+
+    createMuteButton(this);
 
     // Title
     this.add.text(width / 2, 20, `B${data.stage}F - Rest Point`, {

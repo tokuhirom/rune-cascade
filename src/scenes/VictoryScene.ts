@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PlayerStats, SaveData } from '../core/constants';
 import { BattleScene } from './BattleScene';
+import { createMuteButton } from '../core/SoundManager';
 
 const ENDING_PAGES = [
   {
@@ -38,6 +39,7 @@ export class VictoryScene extends Phaser.Scene {
 
     // Clear previous
     this.children.removeAll();
+    createMuteButton(this);
 
     if (this.currentPage < ENDING_PAGES.length) {
       // Story pages

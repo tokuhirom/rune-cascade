@@ -7,6 +7,7 @@ import {
   StageModifier, STAGE_MODIFIERS, rollStageModifier, SaveData,
 } from '../core/constants';
 import { Effects } from '../core/Effects';
+import { soundManager, createMuteButton } from '../core/SoundManager';
 
 export class BattleScene extends Phaser.Scene {
   private board!: Board;
@@ -196,6 +197,12 @@ export class BattleScene extends Phaser.Scene {
         this.dragStartCell = null;
       }
     });
+
+    // Mute toggle button (top-right)
+    createMuteButton(this);
+
+    // Start BGM
+    soundManager.startBattleBgm();
   }
 
   private pointerToCell(x: number, y: number): [number, number] | null {
@@ -424,6 +431,7 @@ export class BattleScene extends Phaser.Scene {
     this.comboCount = 0;
 
     this.board.swap(r1, c1, r2, c2);
+    soundManager.playSwapSfx();
     await this.animateSwap(r1, c1, r2, c2);
 
     const matches = this.board.findMatches();
@@ -469,6 +477,7 @@ export class BattleScene extends Phaser.Scene {
     // Check player death
     if (this.player.hp <= 0) {
       BattleScene.clearRunSave();
+      soundManager.stopBgm();
       this.time.delayedCall(500, () => {
         // Restore gems to pre-run value on death
         this.player.gems = this.player.gemsAtRunStart;
@@ -490,6 +499,7 @@ export class BattleScene extends Phaser.Scene {
 
     while (matches.length > 0) {
       this.comboCount++;
+      soundManager.playMatchSfx(this.comboCount);
       if (this.comboCount > 1) {
         this.showCombo(this.comboCount);
       }
@@ -602,6 +612,7 @@ export class BattleScene extends Phaser.Scene {
           const gained = Math.floor(effectiveDef * 4 * power * shieldMult);
           this.shieldBuffer += gained;
           this.fx.shieldShimmer(sw / 2, 218);
+          soundManager.playShieldSfx();
           break;
         }
         case RuneType.Heart: {
@@ -612,6 +623,7 @@ export class BattleScene extends Phaser.Scene {
             const heal = Math.max(3, Math.floor(this.player.maxHp * 0.08 * power));
             this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
             this.fx.healSparkle(sw / 2, 218);
+            soundManager.playHealSfx();
           }
           break;
         }
@@ -635,6 +647,7 @@ export class BattleScene extends Phaser.Scene {
           const goldGain = Math.max(1, Math.floor(count * power * goldMult * floorBonus * turnDecay));
           this.player.gems += goldGain;
           this.fx.goldCollect(sw / 2, 248, goldGain);
+          soundManager.playGoldSfx();
           break;
         }
       }
@@ -669,6 +682,7 @@ export class BattleScene extends Phaser.Scene {
 
   private async enemyDefeated(): Promise<void> {
     const { width } = this.scale;
+    soundManager.playDefeatSfx();
     this.fx.deathExplosion(width / 2, 85);
 
     this.tweens.add({
@@ -711,12 +725,14 @@ export class BattleScene extends Phaser.Scene {
     // Floor 100 cleared = victory
     if (this.stage >= MAX_FLOOR) {
       BattleScene.clearRunSave();
+      soundManager.stopBgm();
       this.scene.start('Victory', { player: this.player, stage: this.stage });
       return;
     }
 
     // Boss stages go to shop
     if (isBoss) {
+      soundManager.stopBgm();
       this.saveRunState(this.stage + 1);
       this.scene.start('Shop', { player: this.player, stage: this.stage });
     } else {
@@ -726,6 +742,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private async enemyAttack(): Promise<void> {
+    soundManager.playEnemyAttackSfx();
     const berserkMult = this.modifier === StageModifier.Berserk ? 1.5 : 1;
 
     // Mid-bosses with MultiHit secondary also do multi-hit
@@ -741,6 +758,7 @@ export class BattleScene extends Phaser.Scene {
         if (dmg > 0) {
           this.fx.screenShake(4, 100);
           this.showDamageNumber(dmg, false);
+          soundManager.playDamageSfx();
         }
         await this.delay(200);
       }
@@ -762,6 +780,7 @@ export class BattleScene extends Phaser.Scene {
         this.fx.playerDamageFlash();
         this.fx.screenShake(8, 300);
         this.showDamageNumber(dmg, false);
+        soundManager.playDamageSfx();
       } else {
         const { width } = this.scale;
         this.fx.shieldShimmer(width / 2, 218);
@@ -881,6 +900,7 @@ export class BattleScene extends Phaser.Scene {
   private showCombo(count: number): void {
     const { width } = this.scale;
     this.fx.comboSplash(width / 2, 254, count);
+    soundManager.playComboSfx(count);
 
     // Escalating screen shake and visual feedback
     if (count >= 2) {

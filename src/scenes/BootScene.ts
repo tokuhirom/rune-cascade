@@ -3,6 +3,7 @@ import {
   RUNE_COLORS, RuneType, CELL_SIZE,
 } from '../core/constants';
 import { BattleScene } from './BattleScene';
+import { soundManager } from '../core/SoundManager';
 
 interface EnemyDesign {
   bodyColor: number;
@@ -148,6 +149,13 @@ export class BootScene extends Phaser.Scene {
     // Generate unique enemy textures
     for (const [name, design] of Object.entries(ENEMY_DESIGNS)) {
       this.generateEnemyTexture(name, design);
+    }
+
+    // Initialize sound system
+    soundManager.init();
+    // Restore mute preference
+    if (localStorage.getItem('rune_cascade_muted') === 'true') {
+      soundManager.toggleMute();
     }
 
     // Load persistent data
