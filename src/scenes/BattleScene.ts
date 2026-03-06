@@ -879,8 +879,11 @@ export class BattleScene extends Phaser.Scene {
 
         const img = this.add.image(0, 0, `rune_${type}`);
         const symbol = this.add.text(0, 0, RUNE_SYMBOLS[type], {
-          fontSize: '22px',
+          fontSize: '24px',
           color: '#ffffff',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
         }).setOrigin(0.5);
 
         const container = this.add.container(targetX, startY, [img, symbol]);
