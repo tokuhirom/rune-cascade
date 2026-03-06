@@ -214,10 +214,11 @@ export class TownScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    // Hit area covers the full button background
+    // Hit area covers the full button background - set high depth to ensure it's on top
     const hitArea = this.add.rectangle(width / 2, y + btnHeight / 2, width - 120, btnHeight)
       .setInteractive({ useHandCursor: true })
-      .setAlpha(0.001);
+      .setAlpha(0.001)
+      .setDepth(100);
 
     hitArea.on('pointerover', () => btn.setColor(hoverColor));
     hitArea.on('pointerout', () => btn.setColor(color));
