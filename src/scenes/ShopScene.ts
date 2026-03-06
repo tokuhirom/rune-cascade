@@ -63,14 +63,37 @@ export class ShopScene extends Phaser.Scene {
       }).setOrigin(0.5);
     }
 
-    // Player status
-    const hpText = this.add.text(width / 2, 162, `HP: ${player.hp} / ${player.maxHp}`, {
+    // Player status panel
+    const statusY = 160;
+    const hpText = this.add.text(width / 2, statusY, `HP: ${player.hp} / ${player.maxHp}`, {
       fontSize: '14px',
       color: player.hp < player.maxHp * 0.5 ? '#e74c3c' : '#2ecc71',
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    const gemsText = this.add.text(width / 2, 180, `Gems: ${player.gems}`, {
+    const statsText = this.add.text(width / 2, statusY + 16, `ATK: ${player.attack}  DEF: ${player.defense}`, {
+      fontSize: '12px',
+      color: '#bdc3c7',
+    }).setOrigin(0.5);
+
+    const buffsInfo: string[] = [];
+    if (player.buffs.atkUp) buffsInfo.push('ATK+50%');
+    if (player.buffs.defUp) buffsInfo.push('DEF+50%');
+    if (player.buffs.regen) buffsInfo.push('Regen');
+    if (player.buffs.noHeal) buffsInfo.push('No Heal');
+    if (player.buffs.cursedObstacles) buffsInfo.push('Cursed');
+    if (player.items.shuffle > 0) buffsInfo.push(`Shuffle x${player.items.shuffle}`);
+
+    let buffsY = statusY + 30;
+    if (buffsInfo.length > 0) {
+      this.add.text(width / 2, buffsY, buffsInfo.join(' / '), {
+        fontSize: '11px',
+        color: '#888888',
+      }).setOrigin(0.5);
+      buffsY += 14;
+    }
+
+    const gemsText = this.add.text(width / 2, buffsY, `Gems: ${player.gems}`, {
       fontSize: '16px',
       color: '#f1c40f',
       fontStyle: 'bold',
@@ -291,7 +314,7 @@ export class ShopScene extends Phaser.Scene {
 
     const items = [...fixedItems, ...picked];
 
-    const startY = 200;
+    const startY = buffsY + 24;
     const itemHeight = 52;
     const itemElements: { bg: Phaser.GameObjects.Graphics; labelText: Phaser.GameObjects.Text; descText: Phaser.GameObjects.Text; costText: Phaser.GameObjects.Text; item: ShopItem; sold: boolean }[] = [];
 
@@ -299,6 +322,7 @@ export class ShopScene extends Phaser.Scene {
       gemsText.setText(`Gems: ${player.gems}`);
       hpText.setText(`HP: ${player.hp} / ${player.maxHp}`);
       hpText.setColor(player.hp < player.maxHp * 0.5 ? '#e74c3c' : '#2ecc71');
+      statsText.setText(`ATK: ${player.attack}  DEF: ${player.defense}`);
       for (const el of itemElements) {
         const canAfford = !el.sold && player.gems >= el.item.cost && el.item.available(player);
         el.bg.clear();
