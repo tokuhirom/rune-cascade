@@ -537,17 +537,21 @@ export class BattleScene extends Phaser.Scene {
 
       this.updateUI();
 
-      // Check enemy death / revive
+      // Check enemy death / revive (but continue cascades)
       if (this.enemy.hp <= 0) {
         if (enemyHasAbility(this.enemy, EnemyAbility.Revive) && !this.enemy.revived) {
           await this.enemyRevive();
-        } else {
-          await this.enemyDefeated();
-          return;
         }
+        // Don't return — let remaining cascades play out (heals, shields, gems)
       }
 
       matches = this.board.findMatches();
+    }
+
+    // After all cascades finish, handle enemy defeat
+    if (this.enemy.hp <= 0 && !(enemyHasAbility(this.enemy, EnemyAbility.Revive) && !this.enemy.revived)) {
+      await this.enemyDefeated();
+      return;
     }
   }
 
@@ -573,6 +577,7 @@ export class BattleScene extends Phaser.Scene {
 
       switch (match.type) {
         case RuneType.Sword: {
+          if (this.enemy.hp <= 0) break; // Enemy already dead
           let dmg = Math.floor(effectiveAtk * power * berserkMult * desperateMult);
           if (enemyHasAbility(this.enemy, EnemyAbility.Armor)) {
             dmg = Math.floor(dmg * 0.5);
@@ -608,6 +613,7 @@ export class BattleScene extends Phaser.Scene {
           break;
         }
         case RuneType.Star: {
+          if (this.enemy.hp <= 0) break; // Enemy already dead
           let starDmg = Math.floor(effectiveAtk * 0.5 * power * berserkMult);
           if (enemyHasAbility(this.enemy, EnemyAbility.Armor)) {
             starDmg = Math.floor(starDmg * 0.5);
