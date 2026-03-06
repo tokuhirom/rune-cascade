@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createInitialPlayer, generateEnemy, rollStageModifier,
+  createInitialPlayer, generateEnemy, rollStageModifier, enemyHasAbility,
   EnemyAbility, StageModifier,
 } from '../../src/core/constants';
 
@@ -15,6 +15,9 @@ describe('createInitialPlayer', () => {
     expect(p.attackLevel).toBe(0);
     expect(p.defenseLevel).toBe(0);
     expect(p.hpLevel).toBe(0);
+    expect(p.items.shuffle).toBe(0);
+    expect(p.buffs.atkUp).toBe(false);
+    expect(p.gemsAtRunStart).toBe(0);
   });
 
   it('hp equals maxHp initially', () => {
@@ -88,9 +91,17 @@ describe('generateEnemy', () => {
     expect(e5.maxHp).toBeGreaterThan(e1.maxHp);
   });
 
-  it('caps enemy name index at array length', () => {
+  it('stage 100 generates Chaos Emperor mid-boss', () => {
     const e = generateEnemy(100);
-    expect(e.name).toBe('Demon Lord');
+    expect(e.name).toBe('Chaos Emperor');
+    expect(e.isMidBoss).toBe(true);
+  });
+
+  it('mid-boss floors generate unique bosses', () => {
+    expect(generateEnemy(20).name).toBe('Hydra');
+    expect(generateEnemy(40).name).toBe('Shadow King');
+    expect(generateEnemy(60).name).toBe('Crystal Titan');
+    expect(generateEnemy(80).name).toBe('Void Wyrm');
   });
 
   it('each enemy has ability description', () => {

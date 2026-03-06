@@ -59,6 +59,44 @@ const ENEMY_DESIGNS: Record<string, EnemyDesign> = {
     shape: 'diamond',
     features: ['horns', 'wings', 'glow'],
   },
+  // Mid-bosses
+  Hydra: {
+    bodyColor: 0x2a6a4a,
+    eyeColor: 0x00ff88,
+    shape: 'diamond',
+    features: ['horns', 'glow'],
+  },
+  'Shadow King': {
+    bodyColor: 0x1a1a2a,
+    eyeColor: 0xaa66ff,
+    shape: 'triangle',
+    features: ['crown', 'glow', 'hood'],
+  },
+  'Crystal Titan': {
+    bodyColor: 0x6a8aaa,
+    eyeColor: 0x88ddff,
+    shape: 'square',
+    features: ['cracks', 'glow'],
+  },
+  'Void Wyrm': {
+    bodyColor: 0x0a0a2a,
+    eyeColor: 0xff00ff,
+    shape: 'diamond',
+    features: ['horns', 'wings', 'glow', 'fire'],
+  },
+  'Chaos Emperor': {
+    bodyColor: 0x2a0a1a,
+    eyeColor: 0xff4400,
+    shape: 'diamond',
+    features: ['horns', 'wings', 'crown', 'glow', 'fire'],
+  },
+  // Merchant
+  Merchant: {
+    bodyColor: 0x3a2a1a,
+    eyeColor: 0xffdd00,
+    shape: 'circle',
+    features: ['hood'],
+  },
 };
 
 export class BootScene extends Phaser.Scene {
@@ -91,7 +129,9 @@ export class BootScene extends Phaser.Scene {
     // Load persistent data
     const saved = localStorage.getItem('rune_cascade_save');
     if (saved) {
-      this.registry.set('save', JSON.parse(saved));
+      const data = JSON.parse(saved);
+      if (!data.warps) data.warps = [];
+      this.registry.set('save', data);
     }
 
     this.scene.start('Title');

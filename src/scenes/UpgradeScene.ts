@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
-import { PlayerStats } from '../core/constants';
-import { BattleScene } from './BattleScene';
+import { PlayerStats, SaveData } from '../core/constants';
 
 interface UpgradeOption {
   label: string;
@@ -14,10 +13,9 @@ export class UpgradeScene extends Phaser.Scene {
     super('Upgrade');
   }
 
-  create(data: { player: PlayerStats; stage?: number }): void {
-    const { width, height } = this.scale;
+  create(data: { player: PlayerStats }): void {
+    const { width } = this.scale;
     const player = data.player;
-    const nextStage = data.stage || 1;
 
     this.add.text(width / 2, 40, 'UPGRADE', {
       fontSize: '32px',
@@ -48,12 +46,6 @@ export class UpgradeScene extends Phaser.Scene {
         desc: `MaxHP +10 (Lv ${player.hpLevel})`,
         cost: 10 + player.hpLevel * 8,
         apply: (p) => { p.hpLevel++; p.maxHp += 10; p.hp = p.maxHp; },
-      },
-      {
-        label: 'Heal',
-        desc: 'Full HP Recovery',
-        cost: 5,
-        apply: (p) => { p.hp = p.maxHp; },
       },
     ];
 
@@ -94,7 +86,7 @@ export class UpgradeScene extends Phaser.Scene {
           player.gems -= upg.cost;
           upg.apply(player);
           this.savePersistent(player);
-          this.scene.restart({ player, stage: nextStage });
+          this.scene.restart({ player });
         });
       }
     });
@@ -106,43 +98,29 @@ export class UpgradeScene extends Phaser.Scene {
       color: '#95a5a6',
     }).setOrigin(0.5);
 
-    // Continue button
-    const continueBtn = this.add.text(width / 2, statsY + 60, '[ CONTINUE ]', {
+    // Back to title
+    const backBtn = this.add.text(width / 2, statsY + 60, '[ BACK ]', {
       fontSize: '24px',
       color: '#2ecc71',
       fontStyle: 'bold',
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
-    continueBtn.on('pointerdown', () => {
-      this.savePersistent(player);
-      this.saveRunState(player, nextStage);
-      this.scene.start('Battle', { player, stage: nextStage });
+    backBtn.on('pointerdown', () => {
+      this.scene.start('Title');
     });
   }
 
   private savePersistent(player: PlayerStats): void {
-    const save = {
+    const raw = localStorage.getItem('rune_cascade_save');
+    const existing: SaveData = raw ? JSON.parse(raw) : { gems: 0, atkLv: 0, defLv: 0, hpLv: 0, warps: [] };
+    const save: SaveData = {
       gems: player.gems,
       atkLv: player.attackLevel,
       defLv: player.defenseLevel,
       hpLv: player.hpLevel,
+      warps: existing.warps || [],
     };
     localStorage.setItem('rune_cascade_save', JSON.stringify(save));
     this.registry.set('save', save);
-  }
-
-  private saveRunState(player: PlayerStats, nextStage: number): void {
-    const runSave = {
-      stage: nextStage,
-      hp: player.hp,
-      maxHp: player.maxHp,
-      attack: player.attack,
-      defense: player.defense,
-      gems: player.gems,
-      attackLevel: player.attackLevel,
-      defenseLevel: player.defenseLevel,
-      hpLevel: player.hpLevel,
-    };
-    localStorage.setItem('rune_cascade_run', JSON.stringify(runSave));
   }
 }
