@@ -62,27 +62,52 @@ export class SoundManager {
 
   // --- SFX ---
 
+  // Helper: create an SFX oscillator that auto-disconnects when done
+  private sfxOsc(type: OscillatorType, start: number, stop: number): { osc: OscillatorNode; gain: GainNode } {
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    osc.type = type;
+    osc.connect(gain);
+    gain.connect(this.sfxGain!);
+    osc.start(start);
+    osc.stop(stop);
+    this.autoDisconnect(osc, [osc, gain]);
+    return { osc, gain };
+  }
+
+  // Helper: create an SFX buffer source that auto-disconnects when done
+  private sfxBuf(buffer: AudioBuffer, start: number, stop: number, extraNodes: AudioNode[] = []): { src: AudioBufferSourceNode; gain: GainNode } {
+    const src = this.ctx!.createBufferSource();
+    src.buffer = buffer;
+    const gain = this.ctx!.createGain();
+    const last = extraNodes.length > 0 ? extraNodes[extraNodes.length - 1] : src;
+    if (extraNodes.length > 0) {
+      src.connect(extraNodes[0]);
+      for (let i = 0; i < extraNodes.length - 1; i++) extraNodes[i].connect(extraNodes[i + 1]);
+      last.connect(gain);
+    } else {
+      src.connect(gain);
+    }
+    gain.connect(this.sfxGain!);
+    src.start(start);
+    src.stop(stop);
+    this.autoDisconnect(src, [src, ...extraNodes, gain]);
+    return { src, gain };
+  }
+
   /** Rune match/clear: bright sparkle sound */
   playMatchSfx(comboCount: number = 1): void {
     if (!this.ctx || !this.sfxGain) return;
     this.ensureContext();
 
     const now = this.ctx.currentTime;
-    // Higher pitch with more combos
     const baseFreq = 600 + comboCount * 80;
 
-    // Quick ascending arpeggio
     for (let i = 0; i < 3; i++) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
+      const { osc, gain } = this.sfxOsc('sine', now + i * 0.05, now + i * 0.05 + 0.2);
       osc.frequency.value = baseFreq + i * 150;
       gain.gain.setValueAtTime(0.3, now + i * 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.15);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(now + i * 0.05);
-      osc.stop(now + i * 0.05 + 0.2);
     }
   }
 
@@ -93,42 +118,25 @@ export class SoundManager {
 
     const now = this.ctx.currentTime;
     const baseFreq = 400 + comboCount * 60;
-
-    // Fanfare arpeggio — more notes for higher combos
     const noteCount = Math.min(3 + comboCount, 8);
-    const intervals = [0, 4, 7, 12, 16, 19, 24, 28]; // major scale semitones
+    const intervals = [0, 4, 7, 12, 16, 19, 24, 28];
 
     for (let i = 0; i < noteCount; i++) {
       const freq = baseFreq * Math.pow(2, intervals[i % intervals.length] / 12);
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = i % 2 === 0 ? 'square' : 'triangle';
-      osc.frequency.value = freq;
-
       const t = now + i * 0.06;
+      const { osc, gain } = this.sfxOsc(i % 2 === 0 ? 'square' : 'triangle', t, t + 0.25);
+      osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, t);
       gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(t);
-      osc.stop(t + 0.25);
     }
 
-    // Bass punch for big combos (5+)
     if (comboCount >= 5) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
+      const { osc, gain } = this.sfxOsc('sine', now, now + 0.35);
       osc.frequency.setValueAtTime(120, now);
       osc.frequency.exponentialRampToValueAtTime(60, now + 0.2);
       gain.gain.setValueAtTime(0.4, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(now);
-      osc.stop(now + 0.35);
     }
   }
 
@@ -139,35 +147,21 @@ export class SoundManager {
 
     const now = this.ctx.currentTime;
 
-    // Low thud
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sine';
+    const { osc, gain } = this.sfxOsc('sine', now, now + 0.35);
     osc.frequency.setValueAtTime(150, now);
     osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
     gain.gain.setValueAtTime(0.5, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(now);
-    osc.stop(now + 0.35);
 
-    // Noise burst (impact texture)
     const bufferSize = this.ctx.sampleRate * 0.15;
     const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
       data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
     }
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-    const noiseGain = this.ctx.createGain();
+    const { gain: noiseGain } = this.sfxBuf(buffer, now, now + 0.2);
     noiseGain.gain.setValueAtTime(0.15, now);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-    noise.connect(noiseGain);
-    noiseGain.connect(this.sfxGain);
-    noise.start(now);
-    noise.stop(now + 0.2);
   }
 
   /** Enemy defeated: victory jingle */
@@ -176,39 +170,25 @@ export class SoundManager {
     this.ensureContext();
 
     const now = this.ctx.currentTime;
-    // Triumphant ascending chord
-    const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+    const notes = [523, 659, 784, 1047];
     for (let i = 0; i < notes.length; i++) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.value = notes[i];
       const t = now + i * 0.1;
+      const { osc, gain } = this.sfxOsc('triangle', t, t + 0.85);
+      osc.frequency.value = notes[i];
       gain.gain.setValueAtTime(0, t);
       gain.gain.linearRampToValueAtTime(0.25, t + 0.05);
       gain.gain.setValueAtTime(0.25, t + 0.3);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(t);
-      osc.stop(t + 0.85);
     }
 
-    // Final chord sustain
     const chord = [523, 659, 784];
     for (const freq of chord) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
       const t = now + 0.5;
+      const { osc, gain } = this.sfxOsc('sine', t, t + 1.3);
+      osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, t);
       gain.gain.linearRampToValueAtTime(0.15, t + 0.1);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(t);
-      osc.stop(t + 1.3);
     }
   }
 
@@ -218,17 +198,11 @@ export class SoundManager {
     this.ensureContext();
 
     const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sawtooth';
+    const { osc, gain } = this.sfxOsc('sawtooth', now, now + 0.25);
     osc.frequency.setValueAtTime(200, now);
     osc.frequency.exponentialRampToValueAtTime(80, now + 0.15);
     gain.gain.setValueAtTime(0.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(now);
-    osc.stop(now + 0.25);
   }
 
   /** Heal sound: gentle chime */
@@ -237,20 +211,14 @@ export class SoundManager {
     this.ensureContext();
 
     const now = this.ctx.currentTime;
-    const notes = [523, 659, 784]; // C E G
+    const notes = [523, 659, 784];
     for (let i = 0; i < notes.length; i++) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = notes[i];
       const t = now + i * 0.08;
+      const { osc, gain } = this.sfxOsc('sine', t, t + 0.35);
+      osc.frequency.value = notes[i];
       gain.gain.setValueAtTime(0, t);
       gain.gain.linearRampToValueAtTime(0.2, t + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(t);
-      osc.stop(t + 0.35);
     }
   }
 
@@ -260,17 +228,11 @@ export class SoundManager {
     this.ensureContext();
 
     const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'triangle';
+    const { osc, gain } = this.sfxOsc('triangle', now, now + 0.35);
     osc.frequency.setValueAtTime(300, now);
     osc.frequency.linearRampToValueAtTime(600, now + 0.15);
     gain.gain.setValueAtTime(0.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(now);
-    osc.stop(now + 0.35);
   }
 
   /** Gold collect sound */
@@ -280,17 +242,11 @@ export class SoundManager {
 
     const now = this.ctx.currentTime;
     for (let i = 0; i < 2; i++) {
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = 1200 + i * 400;
       const t = now + i * 0.06;
+      const { osc, gain } = this.sfxOsc('square', t, t + 0.15);
+      osc.frequency.value = 1200 + i * 400;
       gain.gain.setValueAtTime(0.1, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(t);
-      osc.stop(t + 0.15);
     }
   }
 
@@ -300,17 +256,11 @@ export class SoundManager {
     this.ensureContext();
 
     const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sine';
+    const { osc, gain } = this.sfxOsc('sine', now, now + 0.12);
     osc.frequency.setValueAtTime(400, now);
     osc.frequency.linearRampToValueAtTime(500, now + 0.08);
     gain.gain.setValueAtTime(0.15, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(now);
-    osc.stop(now + 0.12);
   }
 
   // --- BGM ---
@@ -340,7 +290,7 @@ export class SoundManager {
       clearTimeout(t);
     }
     this.bgmTimers = [];
-    // Stop all scheduled audio nodes
+    // Stop and disconnect all scheduled audio nodes
     for (const node of this.bgmNodes) {
       try {
         if (node instanceof AudioScheduledSourceNode) {
@@ -349,6 +299,7 @@ export class SoundManager {
       } catch {
         // already stopped
       }
+      try { node.disconnect(); } catch { /* already disconnected */ }
     }
     this.bgmNodes = [];
   }
@@ -374,10 +325,20 @@ export class SoundManager {
       // Only continue if this is still the same BGM session
       if (this.bgmPlaying && this.bgmGeneration === gen) {
         this.bgmNodes = [];
+        this.bgmTimers = [];
         this.scheduleBgmLoop();
       }
     }, (loopDur - 0.1) * 1000);
     this.bgmTimers.push(timerId);
+  }
+
+  // Auto-disconnect a source node and its chain when it ends
+  private autoDisconnect(src: AudioScheduledSourceNode, chain: AudioNode[]): void {
+    src.onended = () => {
+      for (const node of chain) {
+        try { node.disconnect(); } catch { /* already disconnected */ }
+      }
+    };
   }
 
   // Helper: schedule an oscillator note (smooth fade-in/out to avoid clicks)
@@ -400,6 +361,7 @@ export class SoundManager {
     gain.connect(this.bgmGain!);
     osc.start(t);
     osc.stop(t + dur + 0.02);
+    this.autoDisconnect(osc, [osc, gain]);
     this.bgmNodes.push(osc);
   }
 
@@ -420,6 +382,7 @@ export class SoundManager {
     gain.connect(this.bgmGain!);
     osc.start(t);
     osc.stop(t + dur + 0.02);
+    this.autoDisconnect(osc, [osc, gain]);
     this.bgmNodes.push(osc);
   }
 
@@ -444,6 +407,7 @@ export class SoundManager {
     gain.connect(this.bgmGain!);
     src.start(t);
     src.stop(t + 0.05);
+    this.autoDisconnect(src, [src, filter, gain]);
     this.bgmNodes.push(src);
   }
 
@@ -460,6 +424,7 @@ export class SoundManager {
     gain.connect(this.bgmGain!);
     osc.start(t);
     osc.stop(t + 0.25);
+    this.autoDisconnect(osc, [osc, gain]);
     this.bgmNodes.push(osc);
   }
 
@@ -541,6 +506,7 @@ export class SoundManager {
         gain.connect(this.bgmGain!);
         src.start(t);
         src.stop(t + 0.1);
+        this.autoDisconnect(src, [src, filter, gain]);
         this.bgmNodes.push(src);
       }
     }
