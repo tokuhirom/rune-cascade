@@ -378,16 +378,17 @@ export class SoundManager {
     const gain = this.ctx!.createGain();
     osc.type = type;
     osc.frequency.value = freq;
-    const fadeIn = Math.min(0.015, dur * 0.1);
-    const fadeOut = Math.min(0.04, dur * 0.2);
+    const fade = Math.min(0.01, dur * 0.15);
     gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(vol, t + fadeIn);
-    gain.gain.setValueAtTime(vol, t + dur - fadeOut);
+    gain.gain.linearRampToValueAtTime(vol, t + fade);
+    if (dur > fade * 3) {
+      gain.gain.setValueAtTime(vol, t + dur - fade * 2);
+    }
     gain.gain.linearRampToValueAtTime(0, t + dur);
     osc.connect(gain);
     gain.connect(this.bgmGain!);
     osc.start(t);
-    osc.stop(t + dur + 0.01);
+    osc.stop(t + dur + 0.02);
     this.bgmNodes.push(osc);
   }
 
@@ -397,16 +398,17 @@ export class SoundManager {
     const gain = this.ctx!.createGain();
     osc.type = type;
     osc.frequency.value = freq;
-    const fadeIn = Math.min(0.01, dur * 0.05);
-    const fadeOut = Math.min(0.03, dur * 0.15);
+    const fade = Math.min(0.008, dur * 0.1);
     gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(vol, t + fadeIn);
-    gain.gain.setValueAtTime(vol, t + dur - fadeOut);
+    gain.gain.linearRampToValueAtTime(vol, t + fade);
+    if (dur > fade * 3) {
+      gain.gain.setValueAtTime(vol, t + dur - fade * 2);
+    }
     gain.gain.linearRampToValueAtTime(0, t + dur);
     osc.connect(gain);
     gain.connect(this.bgmGain!);
     osc.start(t);
-    osc.stop(t + dur + 0.01);
+    osc.stop(t + dur + 0.02);
     this.bgmNodes.push(osc);
   }
 
