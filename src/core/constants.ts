@@ -189,7 +189,7 @@ export function createInitialPlayer(): PlayerStats {
     maxHp: 50,
     hp: 50,
     attack: 5,
-    defense: 1,
+    defense: 3,
     gems: 0,
     attackLevel: 0,
     defenseLevel: 0,

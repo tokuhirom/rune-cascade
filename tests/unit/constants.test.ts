@@ -10,7 +10,7 @@ describe('createInitialPlayer', () => {
     expect(p.hp).toBe(50);
     expect(p.maxHp).toBe(50);
     expect(p.attack).toBe(5);
-    expect(p.defense).toBe(1);
+    expect(p.defense).toBe(3);
     expect(p.gems).toBe(0);
     expect(p.attackLevel).toBe(0);
     expect(p.defenseLevel).toBe(0);

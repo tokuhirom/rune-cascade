@@ -83,7 +83,7 @@ export class TownScene extends Phaser.Scene {
       player.defenseLevel = save.defLv || 0;
       player.hpLevel = save.hpLv || 0;
       player.attack += player.attackLevel * 2;
-      player.defense += player.defenseLevel * 1;
+      player.defense += player.defenseLevel * 2;
       player.maxHp += player.hpLevel * 10;
       player.hp = player.maxHp;
     }
@@ -167,7 +167,7 @@ export class TownScene extends Phaser.Scene {
 
       const upgrades = [
         { label: `ATK Up (${10 + player.attackLevel * 8}G)`, cost: 10 + player.attackLevel * 8, apply: () => { player.attackLevel++; player.attack += 2; } },
-        { label: `DEF Up (${10 + player.defenseLevel * 8}G)`, cost: 10 + player.defenseLevel * 8, apply: () => { player.defenseLevel++; player.defense += 1; } },
+        { label: `DEF Up (${10 + player.defenseLevel * 8}G)`, cost: 10 + player.defenseLevel * 8, apply: () => { player.defenseLevel++; player.defense += 2; } },
         { label: `HP Up (${10 + player.hpLevel * 8}G)`, cost: 10 + player.hpLevel * 8, apply: () => { player.hpLevel++; player.maxHp += 10; player.hp = player.maxHp; } },
       ];
 

@@ -422,7 +422,6 @@ export class BattleScene extends Phaser.Scene {
 
     this.isProcessing = true;
     this.comboCount = 0;
-    this.shieldBuffer = 0;
 
     this.board.swap(r1, c1, r2, c2);
     await this.animateSwap(r1, c1, r2, c2);
@@ -593,7 +592,8 @@ export class BattleScene extends Phaser.Scene {
         }
         case RuneType.Shield: {
           const shieldMult = this.modifier === StageModifier.Fortified ? 2 : 1;
-          this.shieldBuffer += Math.floor(effectiveDef * 2 * power * shieldMult);
+          const gained = Math.floor(effectiveDef * 4 * power * shieldMult);
+          this.shieldBuffer += gained;
           this.fx.shieldShimmer(sw / 2, 218);
           break;
         }
@@ -721,10 +721,13 @@ export class BattleScene extends Phaser.Scene {
 
     // Mid-bosses with MultiHit secondary also do multi-hit
     if (enemyHasAbility(this.enemy, EnemyAbility.MultiHit)) {
+      let totalBlocked = 0;
       for (let i = 0; i < 3; i++) {
-        let dmg = Math.floor(this.enemy.attack * 0.5 * berserkMult) - this.shieldBuffer;
-        this.shieldBuffer = Math.max(0, this.shieldBuffer - Math.floor(this.enemy.attack * 0.5 * berserkMult));
-        if (dmg < 0) dmg = 0;
+        const rawDmg = Math.floor(this.enemy.attack * 0.5 * berserkMult);
+        const blocked = Math.min(this.shieldBuffer, rawDmg);
+        this.shieldBuffer -= blocked;
+        totalBlocked += blocked;
+        const dmg = rawDmg - blocked;
         this.player.hp = Math.max(0, this.player.hp - dmg);
         if (dmg > 0) {
           this.fx.screenShake(4, 100);
@@ -733,14 +736,19 @@ export class BattleScene extends Phaser.Scene {
         await this.delay(200);
       }
       this.fx.playerDamageFlash();
-      this.shieldBuffer = 0;
+      if (totalBlocked > 0) {
+        this.showStatusMessage(`Shield blocked ${totalBlocked}!`, '#3498db');
+      }
     } else {
-      let baseDmg = Math.floor(this.enemy.attack * berserkMult);
-      let dmg = baseDmg - this.shieldBuffer;
-      this.shieldBuffer = 0;
-      if (dmg < 0) dmg = 0;
+      const baseDmg = Math.floor(this.enemy.attack * berserkMult);
+      const blocked = Math.min(this.shieldBuffer, baseDmg);
+      this.shieldBuffer -= blocked;
+      const dmg = baseDmg - blocked;
       this.player.hp = Math.max(0, this.player.hp - dmg);
 
+      if (blocked > 0) {
+        this.showStatusMessage(`Shield blocked ${blocked}!`, '#3498db');
+      }
       if (dmg > 0) {
         this.fx.playerDamageFlash();
         this.fx.screenShake(8, 300);
@@ -893,13 +901,13 @@ export class BattleScene extends Phaser.Scene {
     const playerRatio = Math.max(0, this.player.hp / this.player.maxHp);
     this.playerHpBar.fillStyle(0x2ecc71, 1);
     this.playerHpBar.fillRect(width / 2 - barWidth / 2, 211, barWidth * playerRatio, 14);
-    this.playerHpText.setText(`HP: ${this.player.hp} / ${this.player.maxHp}  Gems: ${this.player.gems}`);
+    const shieldInfo = this.shieldBuffer > 0 ? `  Shield: ${this.shieldBuffer}` : '';
+    this.playerHpText.setText(`HP: ${this.player.hp} / ${this.player.maxHp}${shieldInfo}  Gems: ${this.player.gems}`);
 
     // Status effects
     const statuses: string[] = [];
     if (this.enemy.enraged) statuses.push('ENRAGED');
     if (enemyHasAbility(this.enemy, EnemyAbility.Poison)) statuses.push('POISONED');
-    if (this.shieldBuffer > 0) statuses.push(`Shield: ${this.shieldBuffer}`);
     this.statusText.setText(statuses.join(' | '));
   }
 
