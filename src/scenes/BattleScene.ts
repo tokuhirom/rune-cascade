@@ -400,7 +400,7 @@ export class BattleScene extends Phaser.Scene {
         this.player.items.shuffle--;
         this.updateShuffleBtn();
         this.isProcessing = true;
-        await this.shuffleBoard();
+        await this.shuffleBoard('item');
         this.isProcessing = false;
       });
     }
@@ -540,7 +540,7 @@ export class BattleScene extends Phaser.Scene {
 
     // Rune Storm modifier
     if (this.modifier === StageModifier.RuneStorm && this.turnCount % 3 === 0 && this.enemy.hp > 0) {
-      await this.shuffleBoard();
+      await this.shuffleBoard('storm');
     }
 
     // Enemy turn
@@ -884,8 +884,8 @@ export class BattleScene extends Phaser.Scene {
 
     // Scramble
     if (enemyHasAbility(this.enemy, EnemyAbility.Scramble)) {
-      await this.delay(200);
-      await this.shuffleBoard();
+      await this.delay(300);
+      await this.shuffleBoard('enemy');
     }
 
     // Freeze / Obstacle
@@ -900,9 +900,26 @@ export class BattleScene extends Phaser.Scene {
     await this.delay(300);
   }
 
-  private async shuffleBoard(): Promise<void> {
-    this.showStatusMessage('Board Shuffled!', '#9b59b6');
-    this.fx.screenShake(4, 200);
+  private async shuffleBoard(source: 'enemy' | 'item' | 'storm' | 'auto' = 'auto'): Promise<void> {
+    switch (source) {
+      case 'enemy':
+        this.showStatusMessage(`${this.enemy.name} scrambled the board!`, '#e74c3c');
+        this.cameras.main.flash(300, 180, 40, 40);
+        this.fx.screenShake(8, 400);
+        break;
+      case 'storm':
+        this.showStatusMessage('Rune Storm!', '#9b59b6');
+        this.fx.screenShake(6, 300);
+        break;
+      case 'item':
+        this.showStatusMessage('Board Shuffled!', '#9b59b6');
+        this.fx.screenShake(4, 200);
+        break;
+      default:
+        this.showStatusMessage('No moves! Reshuffling...', '#888888');
+        this.fx.screenShake(3, 150);
+        break;
+    }
 
     const promises: Promise<void>[] = [];
     for (let r = 0; r < BOARD_ROWS; r++) {
