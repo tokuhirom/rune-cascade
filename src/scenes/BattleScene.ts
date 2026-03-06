@@ -608,7 +608,8 @@ export class BattleScene extends Phaser.Scene {
           if (this.modifier === StageModifier.Desperate || this.player.buffs.noHeal) {
             this.showStatusMessage('No healing!', '#e67e22');
           } else {
-            const heal = Math.floor(5 * power);
+            // Heal scales with max HP (8% per 3-match, more with combos/longer matches)
+            const heal = Math.max(3, Math.floor(this.player.maxHp * 0.08 * power));
             this.player.hp = Math.min(this.player.maxHp, this.player.hp + heal);
             this.fx.healSparkle(sw / 2, 218);
           }

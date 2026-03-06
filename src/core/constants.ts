@@ -162,13 +162,13 @@ interface EnemyTemplate {
 
 const ENEMY_TEMPLATES: EnemyTemplate[] = [
   { name: 'Goblin', hpMult: 1.0, atkMult: 1.0, timer: 3, ability: EnemyAbility.None, abilityDesc: '' },
-  { name: 'Skeleton', hpMult: 0.8, atkMult: 0.9, timer: 2, ability: EnemyAbility.Revive, abilityDesc: 'Revives once at 50% HP' },
-  { name: 'Orc', hpMult: 1.4, atkMult: 1.2, timer: 4, ability: EnemyAbility.Enrage, abilityDesc: 'Enrages below 30% HP (ATK x2)' },
-  { name: 'Dark Mage', hpMult: 0.9, atkMult: 1.0, timer: 3, ability: EnemyAbility.Freeze, abilityDesc: 'Freezes 2 runes on attack' },
-  { name: 'Golem', hpMult: 2.0, atkMult: 0.8, timer: 5, ability: EnemyAbility.Obstacle, abilityDesc: 'Places 2 obstacles on attack' },
-  { name: 'Dragon', hpMult: 1.5, atkMult: 1.5, timer: 4, ability: EnemyAbility.MultiHit, abilityDesc: 'Attacks 3 times' },
-  { name: 'Lich', hpMult: 1.2, atkMult: 1.1, timer: 3, ability: EnemyAbility.Drain, abilityDesc: 'Drains HP on attack' },
-  { name: 'Demon Lord', hpMult: 2.0, atkMult: 1.8, timer: 4, ability: EnemyAbility.Poison, abilityDesc: 'Poisons you (5 dmg/turn)' },
+  { name: 'Skeleton', hpMult: 0.8, atkMult: 0.8, timer: 2, ability: EnemyAbility.Revive, abilityDesc: 'Revives once at 50% HP' },
+  { name: 'Orc', hpMult: 1.3, atkMult: 1.1, timer: 4, ability: EnemyAbility.Enrage, abilityDesc: 'Enrages below 30% HP (ATK x2)' },
+  { name: 'Dark Mage', hpMult: 0.9, atkMult: 0.9, timer: 3, ability: EnemyAbility.Freeze, abilityDesc: 'Freezes 2 runes on attack' },
+  { name: 'Golem', hpMult: 1.8, atkMult: 0.7, timer: 5, ability: EnemyAbility.Obstacle, abilityDesc: 'Places 2 obstacles on attack' },
+  { name: 'Dragon', hpMult: 1.4, atkMult: 1.3, timer: 4, ability: EnemyAbility.MultiHit, abilityDesc: 'Attacks 3 times' },
+  { name: 'Lich', hpMult: 1.1, atkMult: 1.0, timer: 3, ability: EnemyAbility.Drain, abilityDesc: 'Drains HP on attack' },
+  { name: 'Demon Lord', hpMult: 1.6, atkMult: 1.4, timer: 4, ability: EnemyAbility.Poison, abilityDesc: 'Poisons you (5 dmg/turn)' },
 ];
 
 // Unique mid-bosses at warp floors (20, 40, 60, 80) and final boss (100)
@@ -177,11 +177,11 @@ interface MidBossTemplate extends EnemyTemplate {
 }
 
 const MID_BOSS_TEMPLATES: MidBossTemplate[] = [
-  { floor: 20, name: 'Hydra', hpMult: 3.0, atkMult: 1.4, timer: 3, ability: EnemyAbility.MultiHit, abilityDesc: 'Multi-headed: Attacks 3 times + Revives once' },
-  { floor: 40, name: 'Shadow King', hpMult: 2.5, atkMult: 1.6, timer: 3, ability: EnemyAbility.Drain, abilityDesc: 'Drains HP + Shuffles board' },
-  { floor: 60, name: 'Crystal Titan', hpMult: 4.0, atkMult: 1.2, timer: 5, ability: EnemyAbility.Armor, abilityDesc: 'Takes 50% damage + Enrages below 30%' },
-  { floor: 80, name: 'Void Wyrm', hpMult: 3.5, atkMult: 2.0, timer: 4, ability: EnemyAbility.Poison, abilityDesc: 'Poisons (8 dmg/turn) + Attacks 3 times' },
-  { floor: 100, name: 'Chaos Emperor', hpMult: 5.0, atkMult: 2.5, timer: 3, ability: EnemyAbility.Drain, abilityDesc: 'Drains HP + Enrages + Poisons (10 dmg/turn)' },
+  { floor: 20, name: 'Hydra', hpMult: 2.5, atkMult: 1.2, timer: 3, ability: EnemyAbility.MultiHit, abilityDesc: 'Multi-headed: Attacks 3 times + Revives once' },
+  { floor: 40, name: 'Shadow King', hpMult: 2.2, atkMult: 1.4, timer: 3, ability: EnemyAbility.Drain, abilityDesc: 'Drains HP + Freezes runes' },
+  { floor: 60, name: 'Crystal Titan', hpMult: 3.0, atkMult: 1.0, timer: 5, ability: EnemyAbility.Armor, abilityDesc: 'Takes 50% damage + Enrages below 30%' },
+  { floor: 80, name: 'Void Wyrm', hpMult: 3.0, atkMult: 1.6, timer: 4, ability: EnemyAbility.Poison, abilityDesc: 'Poisons (8 dmg/turn) + Attacks 3 times' },
+  { floor: 100, name: 'Chaos Emperor', hpMult: 4.0, atkMult: 2.0, timer: 3, ability: EnemyAbility.Drain, abilityDesc: 'Drains HP + Enrages + Poisons (10 dmg/turn)' },
 ];
 
 export function createInitialPlayer(): PlayerStats {
@@ -209,9 +209,9 @@ export function generateEnemy(stage: number): EnemyData {
 
   const idx = Math.min(stage - 1, ENEMY_TEMPLATES.length - 1);
   const tmpl = ENEMY_TEMPLATES[idx % ENEMY_TEMPLATES.length];
-  const stageScale = 1 + (stage - 1) * 0.3;
-  const hp = Math.floor(30 * tmpl.hpMult * stageScale);
-  const atk = Math.floor(5 * tmpl.atkMult * stageScale);
+  const stageScale = 1 + (stage - 1) * 0.15;
+  const hp = Math.floor(40 * tmpl.hpMult * stageScale);
+  const atk = Math.floor(6 * tmpl.atkMult * stageScale);
   return {
     name: tmpl.name,
     maxHp: hp,
@@ -228,9 +228,9 @@ export function generateEnemy(stage: number): EnemyData {
 }
 
 function generateMidBoss(tmpl: MidBossTemplate, stage: number): EnemyData {
-  const stageScale = 1 + (stage - 1) * 0.3;
-  const hp = Math.floor(30 * tmpl.hpMult * stageScale);
-  const atk = Math.floor(5 * tmpl.atkMult * stageScale);
+  const stageScale = 1 + (stage - 1) * 0.15;
+  const hp = Math.floor(40 * tmpl.hpMult * stageScale);
+  const atk = Math.floor(6 * tmpl.atkMult * stageScale);
   const poisonDmg = tmpl.name === 'Void Wyrm' ? 8 : tmpl.name === 'Chaos Emperor' ? 10 : 0;
   return {
     name: tmpl.name,
