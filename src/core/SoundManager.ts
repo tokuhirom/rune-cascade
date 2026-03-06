@@ -446,37 +446,87 @@ export class SoundManager {
     this.bgmNodes.push(osc);
   }
 
-  // === Normal Battle BGM (Am-F-G-E, 140bpm, energetic chiptune) ===
+  // === Normal Battle BGM (Em-C-D-Bm, 145bpm, tense dungeon crawl) ===
   private playBattleBgm(now: number): number {
-    const bpm = 140;
+    const bpm = 145;
     const beat = 60 / bpm;
     const bar = beat * 4;
     const loopDur = bar * 4;
 
-    // Bass
-    const bass = [
-      [220, 0], [220, beat], [330, beat*2], [220, beat*3],
-      [175, bar], [175, bar+beat], [262, bar+beat*2], [175, bar+beat*3],
-      [196, bar*2], [196, bar*2+beat], [294, bar*2+beat*2], [196, bar*2+beat*3],
-      [165, bar*3], [165, bar*3+beat], [247, bar*3+beat*2], [330, bar*3+beat*3],
-    ];
-    for (const [n, t] of bass) this.schedBass(n, now+t, beat);
+    // Driving sawtooth bass (8th note pulse for urgency)
+    const bassRoots = [82, 82, 65, 65, 73, 73, 62, 62]; // Em, Em, C, C, D, D, Bm, Bm (low octave)
+    for (let b = 0; b < 4; b++) {
+      for (let i = 0; i < 4; i++) {
+        const root = bassRoots[b * 2 + (i < 2 ? 0 : 1)];
+        const freq = i % 2 === 0 ? root : root * 1.5; // root-fifth pattern
+        this.schedBass(freq, now + b*bar + i*beat, beat*0.8, 'sawtooth', 0.13);
+      }
+      // 8th note fills on beats 3-4
+      for (let i = 0; i < 4; i++) {
+        const root = bassRoots[b * 2 + 1];
+        this.schedBass(root, now + b*bar + beat*2 + i*beat*0.5, beat*0.4, 'sawtooth', 0.09);
+      }
+    }
 
-    // Melody
+    // Tense melody (square wave, minor key, fast rhythmic phrases)
     const mel: [number, number, number][] = [
-      [880, 0, beat*0.5], [784, beat*0.5, beat*0.5], [660, beat, beat],
-      [784, beat*2, beat*0.5], [880, beat*2.5, beat*0.5], [1047, beat*3, beat],
-      [880, bar, beat], [784, bar+beat, beat*0.5], [660, bar+beat*1.5, beat*0.5],
-      [698, bar+beat*2, beat*2],
-      [784, bar*2, beat*0.5], [880, bar*2+beat*0.5, beat*0.5], [988, bar*2+beat, beat],
-      [880, bar*2+beat*2, beat*0.5], [784, bar*2+beat*2.5, beat*0.5], [660, bar*2+beat*3, beat],
-      [784, bar*3, beat], [660, bar*3+beat, beat*0.5], [784, bar*3+beat*1.5, beat*0.5],
-      [880, bar*3+beat*2, beat*2],
+      // Bar 1 (Em): driving minor riff
+      [660, 0, beat*0.5], [622, beat*0.5, beat*0.25], [660, beat*0.75, beat*0.25],
+      [784, beat, beat*0.5], [740, beat*1.5, beat*0.5],
+      [660, beat*2, beat*0.5], [588, beat*2.5, beat*0.5], [524, beat*3, beat*0.5],
+      [588, beat*3.5, beat*0.5],
+      // Bar 2 (C): tension build
+      [524, bar, beat*0.5], [588, bar+beat*0.5, beat*0.5],
+      [660, bar+beat, beat], [784, bar+beat*2, beat*0.5],
+      [740, bar+beat*2.5, beat*0.5], [660, bar+beat*3, beat],
+      // Bar 3 (D): ascending urgency
+      [588, bar*2, beat*0.25], [660, bar*2+beat*0.25, beat*0.25],
+      [740, bar*2+beat*0.5, beat*0.5], [784, bar*2+beat, beat*0.5],
+      [880, bar*2+beat*1.5, beat*0.5], [988, bar*2+beat*2, beat],
+      [880, bar*2+beat*3, beat*0.5], [784, bar*2+beat*3.5, beat*0.5],
+      // Bar 4 (Bm): resolving descent
+      [740, bar*3, beat], [660, bar*3+beat, beat*0.5],
+      [588, bar*3+beat*1.5, beat*0.5], [494, bar*3+beat*2, beat],
+      [524, bar*3+beat*3, beat*0.5], [588, bar*3+beat*3.5, beat*0.5],
     ];
-    for (const [n, t, d] of mel) this.schedNote(n, now+t, d);
+    for (const [n, t, d] of mel) this.schedNote(n, now+t, d, 'square', 0.10);
 
-    // Hi-hats on 8th notes
-    for (let i = 0; i < 32; i++) this.schedHiHat(now + i * beat/2, i%2===0);
+    // Kick on every beat for drive
+    for (let i = 0; i < 16; i++) {
+      this.schedKick(now + i * beat, i%4===0 ? 0.18 : 0.10);
+    }
+
+    // Hi-hats on 8th and 16th notes (more aggressive)
+    for (let i = 0; i < 32; i++) {
+      this.schedHiHat(now + i * beat/2, i%2===0);
+    }
+
+    // Snare-like noise on beats 2 and 4
+    for (let b = 0; b < 4; b++) {
+      for (const off of [beat, beat*3]) {
+        const t = now + b * bar + off;
+        const bufLen = Math.floor(this.ctx!.sampleRate * 0.06);
+        const buf = this.ctx!.createBuffer(1, bufLen, this.ctx!.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let j = 0; j < bufLen; j++) {
+          d[j] = (Math.random() * 2 - 1) * (1 - j / bufLen) * 0.8;
+        }
+        const src = this.ctx!.createBufferSource();
+        src.buffer = buf;
+        const gain = this.ctx!.createGain();
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+        const filter = this.ctx!.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 3000;
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.bgmGain!);
+        src.start(t);
+        src.stop(t + 0.1);
+        this.bgmNodes.push(src);
+      }
+    }
 
     return loopDur;
   }
