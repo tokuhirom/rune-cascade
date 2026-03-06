@@ -367,13 +367,23 @@ export class BattleScene extends Phaser.Scene {
     // Buff indicators
     const buffY = 272;
     const buffTexts: string[] = [];
+    const debuffTexts: string[] = [];
     if (this.player.buffs.atkUp) buffTexts.push('ATK+');
     if (this.player.buffs.defUp) buffTexts.push('DEF+');
     if (this.player.buffs.regen) buffTexts.push('REGEN');
+    if (this.player.buffs.noHeal) debuffTexts.push('NO HEAL');
+    if (this.player.buffs.cursedObstacles) debuffTexts.push('CURSED');
     if (buffTexts.length > 0) {
       this.add.text(width / 2, buffY, buffTexts.join(' | '), {
         fontSize: '11px',
         color: '#44cc88',
+        fontStyle: 'bold',
+      }).setOrigin(0.5);
+    }
+    if (debuffTexts.length > 0) {
+      this.add.text(width / 2, buffY + (buffTexts.length > 0 ? 14 : 0), debuffTexts.join(' | '), {
+        fontSize: '11px',
+        color: '#e74c3c',
         fontStyle: 'bold',
       }).setOrigin(0.5);
     }
@@ -588,7 +598,7 @@ export class BattleScene extends Phaser.Scene {
           break;
         }
         case RuneType.Heart: {
-          if (this.modifier === StageModifier.Desperate) {
+          if (this.modifier === StageModifier.Desperate || this.player.buffs.noHeal) {
             this.showStatusMessage('No healing!', '#e67e22');
           } else {
             const heal = Math.floor(5 * power);
@@ -1127,10 +1137,11 @@ export class BattleScene extends Phaser.Scene {
       }
     }
 
-    // Obstacle ability
-    if (enemyHasAbility(this.enemy, EnemyAbility.Obstacle)) {
-      const obstacleCount = Math.min(2 + Math.floor(this.stage / 25), 3);
-      const placed = this.board.placeObstacles(obstacleCount);
+    // Obstacle ability + cursed obstacles from player debuff
+    const enemyObstacles = enemyHasAbility(this.enemy, EnemyAbility.Obstacle) ? Math.min(2 + Math.floor(this.stage / 25), 3) : 0;
+    const totalObstacles = enemyObstacles + (this.player.buffs.cursedObstacles || 0);
+    if (totalObstacles > 0) {
+      const placed = this.board.placeObstacles(totalObstacles);
       for (const [r, c] of placed) {
         this.refreshRuneVisual(r, c);
         const sprite = this.runeSprites[r]?.[c];
@@ -1243,7 +1254,7 @@ export class BattleScene extends Phaser.Scene {
       if (data && typeof data.stage === 'number' && data.stage > 0) {
         // Ensure new fields exist
         if (!data.items) data.items = { shuffle: 0 };
-        if (!data.buffs) data.buffs = { atkUp: false, defUp: false, regen: false };
+        if (!data.buffs) data.buffs = { atkUp: false, defUp: false, regen: false, noHeal: false, cursedObstacles: 0 };
         if (data.gemsAtRunStart === undefined) data.gemsAtRunStart = 0;
         return data;
       }

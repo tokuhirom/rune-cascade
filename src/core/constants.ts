@@ -49,6 +49,8 @@ export interface PlayerBuffs {
   atkUp: boolean;
   defUp: boolean;
   regen: boolean;
+  noHeal: boolean;          // Heart runes disabled
+  cursedObstacles: number;  // Extra obstacles placed each enemy attack (0=off)
 }
 
 export interface PlayerStats {
@@ -193,7 +195,7 @@ export function createInitialPlayer(): PlayerStats {
     defenseLevel: 0,
     hpLevel: 0,
     items: { shuffle: 0 },
-    buffs: { atkUp: false, defUp: false, regen: false },
+    buffs: { atkUp: false, defUp: false, regen: false, noHeal: false, cursedObstacles: 0 },
     gemsAtRunStart: 0,
   };
 }

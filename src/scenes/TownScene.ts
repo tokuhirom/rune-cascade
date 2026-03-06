@@ -119,7 +119,7 @@ export class TownScene extends Phaser.Scene {
           defenseLevel: runSave.defenseLevel,
           hpLevel: runSave.hpLevel,
           items: runSave.items || { shuffle: 0 },
-          buffs: runSave.buffs || { atkUp: false, defUp: false, regen: false },
+          buffs: runSave.buffs || { atkUp: false, defUp: false, regen: false, noHeal: false, cursedObstacles: 0 },
           gemsAtRunStart: runSave.gemsAtRunStart || 0,
         };
         this.scene.start('Battle', { player: resumePlayer, stage: runSave.stage });

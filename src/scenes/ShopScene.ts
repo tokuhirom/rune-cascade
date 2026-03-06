@@ -2,10 +2,20 @@ import Phaser from 'phaser';
 import { PlayerStats, SaveData, WARP_FLOORS } from '../core/constants';
 import { BattleScene } from './BattleScene';
 
+type Rarity = 'common' | 'rare' | 'epic' | 'cursed';
+
+const RARITY_COLORS: Record<Rarity, { border: number; label: string; tag: string }> = {
+  common:  { border: 0x888888, label: '#cccccc', tag: '' },
+  rare:    { border: 0x3498db, label: '#5dade2', tag: '[Rare] ' },
+  epic:    { border: 0x9b59b6, label: '#bb8fce', tag: '[Epic] ' },
+  cursed:  { border: 0xe74c3c, label: '#e74c3c', tag: '[Cursed] ' },
+};
+
 interface ShopItem {
   label: string;
   desc: string;
   cost: number;
+  rarity: Rarity;
   available: (p: PlayerStats) => boolean;
   apply: (p: PlayerStats) => void;
 }
@@ -62,86 +72,224 @@ export class ShopScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    // Shop items: fixed (heal/return) + random selection from pool
+    // Shop items: fixed (heal) + random selection from pool
     const returnCost = 30 + data.stage * 2;
 
     const fixedItems: ShopItem[] = [
       {
         label: 'Heal 50%',
         desc: 'Recover half of max HP',
-        cost: 10,
+        cost: 15 + Math.floor(data.stage / 10) * 5,
+        rarity: 'common',
         available: (p) => p.hp < p.maxHp,
         apply: (p) => { p.hp = Math.min(p.maxHp, p.hp + Math.floor(p.maxHp * 0.5)); },
       },
       {
         label: 'Full Heal',
         desc: 'Fully restore HP',
-        cost: 25,
+        cost: 35 + Math.floor(data.stage / 10) * 5,
+        rarity: 'common',
         available: (p) => p.hp < p.maxHp,
         apply: (p) => { p.hp = p.maxHp; },
       },
     ];
 
-    const randomPool: ShopItem[] = [
-      {
-        label: 'ATK Boost',
-        desc: 'ATK +50% this run',
-        cost: 20,
-        available: (p) => !p.buffs.atkUp,
-        apply: (p) => { p.buffs.atkUp = true; },
-      },
-      {
-        label: 'DEF Boost',
-        desc: 'DEF +50% this run',
-        cost: 15,
-        available: (p) => !p.buffs.defUp,
-        apply: (p) => { p.buffs.defUp = true; },
-      },
-      {
-        label: 'Regen',
-        desc: 'Heal 3 HP per turn',
-        cost: 15,
-        available: (p) => !p.buffs.regen,
-        apply: (p) => { p.buffs.regen = true; },
-      },
-      {
-        label: 'Shuffle Rune',
-        desc: 'Consumable: shuffle board x1',
-        cost: 8,
-        available: () => true,
-        apply: (p) => { p.items.shuffle++; },
-      },
+    const commonPool: ShopItem[] = [
       {
         label: 'Whetstone',
         desc: 'ATK +3 this run',
-        cost: 12,
+        cost: 20,
+        rarity: 'common',
         available: () => true,
         apply: (p) => { p.attack += 3; },
       },
       {
         label: 'Iron Shield',
         desc: 'DEF +2 this run',
-        cost: 10,
+        cost: 18,
+        rarity: 'common',
         available: () => true,
         apply: (p) => { p.defense += 2; },
       },
       {
         label: 'Vitality Herb',
-        desc: 'Max HP +10 this run',
-        cost: 10,
+        desc: 'Max HP +15 this run',
+        cost: 18,
+        rarity: 'common',
         available: () => true,
-        apply: (p) => { p.maxHp += 10; p.hp += 10; },
+        apply: (p) => { p.maxHp += 15; p.hp += 15; },
+      },
+      {
+        label: 'Shuffle Rune',
+        desc: 'Consumable: shuffle board x1',
+        cost: 12,
+        rarity: 'common',
+        available: () => true,
+        apply: (p) => { p.items.shuffle++; },
+      },
+      {
+        label: 'Regen Charm',
+        desc: 'Heal 3 HP per turn',
+        cost: 30,
+        rarity: 'common',
+        available: (p) => !p.buffs.regen,
+        apply: (p) => { p.buffs.regen = true; },
       },
     ];
 
-    // Pick 3 random items from pool
-    const shuffled = randomPool.sort(() => Math.random() - 0.5);
-    const picked = shuffled.slice(0, 3);
+    const rarePool: ShopItem[] = [
+      {
+        label: 'ATK Boost',
+        desc: 'ATK +50% this run',
+        cost: 50,
+        rarity: 'rare',
+        available: (p) => !p.buffs.atkUp,
+        apply: (p) => { p.buffs.atkUp = true; },
+      },
+      {
+        label: 'DEF Boost',
+        desc: 'DEF +50% this run',
+        cost: 40,
+        rarity: 'rare',
+        available: (p) => !p.buffs.defUp,
+        apply: (p) => { p.buffs.defUp = true; },
+      },
+      {
+        label: 'War Axe',
+        desc: 'ATK +8 this run',
+        cost: 45,
+        rarity: 'rare',
+        available: () => true,
+        apply: (p) => { p.attack += 8; },
+      },
+      {
+        label: 'Titan Belt',
+        desc: 'Max HP +40 this run',
+        cost: 40,
+        rarity: 'rare',
+        available: () => true,
+        apply: (p) => { p.maxHp += 40; p.hp += 40; },
+      },
+      {
+        label: 'Shuffle Pack',
+        desc: 'Consumable: shuffle board x3',
+        cost: 30,
+        rarity: 'rare',
+        available: () => true,
+        apply: (p) => { p.items.shuffle += 3; },
+      },
+    ];
+
+    const epicPool: ShopItem[] = [
+      {
+        label: 'Dragon Blade',
+        desc: 'ATK +15 this run',
+        cost: 80,
+        rarity: 'epic',
+        available: () => true,
+        apply: (p) => { p.attack += 15; },
+      },
+      {
+        label: 'Adamant Armor',
+        desc: 'DEF +10 this run',
+        cost: 70,
+        rarity: 'epic',
+        available: () => true,
+        apply: (p) => { p.defense += 10; },
+      },
+      {
+        label: 'Elixir of Life',
+        desc: 'Max HP +80, full heal',
+        cost: 90,
+        rarity: 'epic',
+        available: () => true,
+        apply: (p) => { p.maxHp += 80; p.hp = p.maxHp; },
+      },
+    ];
+
+    const cursedPool: ShopItem[] = [
+      {
+        label: 'Berserker Pact',
+        desc: 'ATK x2 but heart runes disabled',
+        cost: 25,
+        rarity: 'cursed',
+        available: (p) => !p.buffs.noHeal,
+        apply: (p) => { p.attack = Math.floor(p.attack * 2); p.buffs.noHeal = true; },
+      },
+      {
+        label: 'Cursed Fortress',
+        desc: 'DEF +20 but obstacles each turn',
+        cost: 20,
+        rarity: 'cursed',
+        available: (p) => !p.buffs.cursedObstacles,
+        apply: (p) => { p.defense += 20; p.buffs.cursedObstacles = 2; },
+      },
+      {
+        label: 'Blood Diamond',
+        desc: 'Gems +50 but lose 30% max HP',
+        cost: 5,
+        rarity: 'cursed',
+        available: () => true,
+        apply: (p) => {
+          p.gems += 50;
+          const hpLoss = Math.floor(p.maxHp * 0.3);
+          p.maxHp -= hpLoss;
+          p.hp = Math.min(p.hp, p.maxHp);
+        },
+      },
+      {
+        label: 'Dark Bargain',
+        desc: 'ATK +10 DEF +5 but 3 obstacles/turn',
+        cost: 15,
+        rarity: 'cursed',
+        available: (p) => !p.buffs.cursedObstacles,
+        apply: (p) => { p.attack += 10; p.defense += 5; p.buffs.cursedObstacles = 3; },
+      },
+    ];
+
+    // Roll rarity for each of 3 random slots
+    // Deeper floors have higher chance of rare/epic
+    const rollRarity = (): Rarity => {
+      const r = Math.random();
+      const epicChance = Math.min(0.05 + data.stage * 0.003, 0.15);
+      const rareChance = Math.min(0.15 + data.stage * 0.005, 0.35);
+      const cursedChance = Math.min(0.05 + data.stage * 0.002, 0.15);
+      if (r < epicChance) return 'epic';
+      if (r < epicChance + rareChance) return 'rare';
+      if (r < epicChance + rareChance + cursedChance) return 'cursed';
+      return 'common';
+    };
+
+    const pickFromPool = (pool: ShopItem[]): ShopItem | null => {
+      const shuffled = [...pool].sort(() => Math.random() - 0.5);
+      return shuffled[0] || null;
+    };
+
+    const picked: ShopItem[] = [];
+    const usedLabels = new Set<string>();
+    for (let i = 0; i < 3; i++) {
+      const rarity = rollRarity();
+      let pool: ShopItem[];
+      switch (rarity) {
+        case 'epic': pool = epicPool; break;
+        case 'rare': pool = rarePool; break;
+        case 'cursed': pool = cursedPool; break;
+        default: pool = commonPool; break;
+      }
+      // Avoid duplicates
+      const available = pool.filter(item => !usedLabels.has(item.label));
+      const item = pickFromPool(available.length > 0 ? available : commonPool.filter(item => !usedLabels.has(item.label)));
+      if (item) {
+        picked.push(item);
+        usedLabels.add(item.label);
+      }
+    }
+
     const items = [...fixedItems, ...picked];
 
     const startY = 200;
     const itemHeight = 52;
-    const itemElements: { bg: Phaser.GameObjects.Graphics; hitArea?: Phaser.GameObjects.Rectangle; labelText: Phaser.GameObjects.Text; costText: Phaser.GameObjects.Text; item: ShopItem }[] = [];
+    const itemElements: { bg: Phaser.GameObjects.Graphics; labelText: Phaser.GameObjects.Text; costText: Phaser.GameObjects.Text; item: ShopItem }[] = [];
 
     const refreshShop = () => {
       gemsText.setText(`Gems: ${player.gems}`);
@@ -152,10 +300,11 @@ export class ShopScene extends Phaser.Scene {
         el.bg.clear();
         el.bg.fillStyle(canAfford ? 0x2c3e50 : 0x1a1a2e, 1);
         const y = startY + itemElements.indexOf(el) * itemHeight;
+        const rarityInfo = RARITY_COLORS[el.item.rarity];
         el.bg.fillRoundedRect(20, y, width - 40, itemHeight - 6, 6);
-        el.bg.lineStyle(1, canAfford ? 0x3498db : 0x444444, 1);
+        el.bg.lineStyle(2, canAfford ? rarityInfo.border : 0x444444, 1);
         el.bg.strokeRoundedRect(20, y, width - 40, itemHeight - 6, 6);
-        el.labelText.setColor(canAfford ? '#ecf0f1' : '#666666');
+        el.labelText.setColor(canAfford ? rarityInfo.label : '#666666');
         el.costText.setColor(canAfford ? '#f1c40f' : '#666666');
       }
     };
@@ -163,16 +312,17 @@ export class ShopScene extends Phaser.Scene {
     items.forEach((item, i) => {
       const y = startY + i * itemHeight;
       const canAfford = player.gems >= item.cost && item.available(player);
+      const rarityInfo = RARITY_COLORS[item.rarity];
 
       const bg = this.add.graphics();
       bg.fillStyle(canAfford ? 0x2c3e50 : 0x1a1a2e, 1);
       bg.fillRoundedRect(20, y, width - 40, itemHeight - 6, 6);
-      bg.lineStyle(1, canAfford ? 0x3498db : 0x444444, 1);
+      bg.lineStyle(2, canAfford ? rarityInfo.border : 0x444444, 1);
       bg.strokeRoundedRect(20, y, width - 40, itemHeight - 6, 6);
 
-      const labelText = this.add.text(35, y + 8, item.label, {
+      const labelText = this.add.text(35, y + 8, rarityInfo.tag + item.label, {
         fontSize: '15px',
-        color: canAfford ? '#ecf0f1' : '#666666',
+        color: canAfford ? rarityInfo.label : '#666666',
         fontStyle: 'bold',
       });
 
@@ -192,7 +342,8 @@ export class ShopScene extends Phaser.Scene {
 
       const hitArea = this.add.rectangle(width / 2, y + (itemHeight - 6) / 2, width - 40, itemHeight - 6)
         .setInteractive({ useHandCursor: true })
-        .setAlpha(0.001);
+        .setAlpha(0.001)
+        .setDepth(100);
 
       hitArea.on('pointerdown', () => {
         if (player.gems >= item.cost && item.available(player)) {
