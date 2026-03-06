@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { Board, MatchResult } from '../core/Board';
 import {
   BOARD_COLS, BOARD_ROWS, CELL_SIZE, BOARD_OFFSET_X, BOARD_OFFSET_Y,
-  RuneType, RUNE_SYMBOLS,
+  RuneType, RUNE_SYMBOLS, RUNE_COLORS,
   PlayerStats, EnemyData, EnemyAbility, generateEnemy,
   StageModifier, STAGE_MODIFIERS, rollStageModifier,
 } from '../core/constants';
@@ -123,6 +123,9 @@ export class BattleScene extends Phaser.Scene {
       color: '#bb88ff',
     }).setOrigin(0.5);
 
+    // Rune legend
+    this.createRuneLegend(width);
+
     this.updateUI();
 
     // Boss entrance animation
@@ -227,6 +230,42 @@ export class BattleScene extends Phaser.Scene {
     container.setData('col', c);
 
     return container;
+  }
+
+  private createRuneLegend(width: number): void {
+    const legends = [
+      { type: RuneType.Sword, label: 'ATK' },
+      { type: RuneType.Shield, label: 'DEF' },
+      { type: RuneType.Heart, label: 'HP' },
+      { type: RuneType.Star, label: 'SKL' },
+      { type: RuneType.Gold, label: 'GEM' },
+    ];
+    const y = 260;
+    const totalWidth = legends.length * 80;
+    const startX = width / 2 - totalWidth / 2 + 40;
+
+    for (let i = 0; i < legends.length; i++) {
+      const { type, label } = legends[i];
+      const x = startX + i * 80;
+      const color = RUNE_COLORS[type];
+
+      // Small colored square
+      const g = this.add.graphics();
+      g.fillStyle(color, 0.8);
+      g.fillRoundedRect(x - 28, y - 8, 16, 16, 3);
+
+      // Symbol
+      this.add.text(x - 20, y, RUNE_SYMBOLS[type], {
+        fontSize: '11px',
+        color: '#ffffff',
+      }).setOrigin(0.5);
+
+      // Label
+      this.add.text(x + 2, y, label, {
+        fontSize: '11px',
+        color: '#888888',
+      }).setOrigin(0, 0.5);
+    }
   }
 
   private highlightCell(r: number, c: number, on: boolean): void {
